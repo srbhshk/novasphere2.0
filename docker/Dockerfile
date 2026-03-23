@@ -1,5 +1,5 @@
 # Stage 1 — install all dependencies
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 RUN corepack enable pnpm
 WORKDIR /app
 
@@ -22,13 +22,13 @@ COPY packages/ui-shell/package.json     ./packages/ui-shell/
 RUN pnpm install --frozen-lockfile
 
 # Stage 2 — build all packages then the app
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 RUN corepack enable pnpm
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps /app/packages ./packages
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -40,7 +40,7 @@ RUN pnpm build --filter "@novasphere/*"
 RUN pnpm build --filter web
 
 # Stage 3 — minimal runtime image
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

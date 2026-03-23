@@ -26,7 +26,7 @@ This repository is a **pnpm + Turborepo monorepo**: shared libraries live under 
 
 ## Requirements
 
-- **Node.js** ≥ 20.9 (required by Next.js 16)
+- **Node.js** ≥ 24.14.0 (project default via nvm)
 - **pnpm** ≥ 9
 - **Docker** (optional but recommended for the full stack demo)
 
@@ -243,7 +243,7 @@ Breaking these boundaries breaks the intended layering and CI expectations.
 2. **Align theme** under `nova.config.ts` → `theme` and tokens for branding.
 3. **Add or change dashboard modules** by wiring new bento cards and tool-capable `moduleId` values.
 4. **Swap or add models** via `apps/web/src/lib/agent/models.ts` and env vars; Ollama remains the default for offline demos.
-5. **Deploy** with Docker Compose or host Node 20+ with the same env contract as production; always set `OLLAMA_BASE_URL` from env (never hardcode Docker vs localhost).
+5. **Deploy** with Docker Compose or host Node 24+ with the same env contract as production; always set `OLLAMA_BASE_URL` from env (never hardcode Docker vs localhost).
 
 ---
 

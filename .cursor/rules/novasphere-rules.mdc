@@ -126,7 +126,7 @@ product_config:
 monorepo:
   tool: pnpm workspaces
   build_system: Turborepo
-  node_version: ">=20.9.0"
+  node_version: ">=24.14.0"
   package_manager: "pnpm >= 9"
 
   workspace_pattern: |
@@ -705,7 +705,7 @@ docker:
 
   dockerfile:
     stages: [deps, builder, runner]
-    base: node:20-alpine
+    base: node:24-alpine
     runner: non-root user, standalone Next.js output only
     cmd: node apps/web/server.js
 

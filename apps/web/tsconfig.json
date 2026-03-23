@@ -19,6 +19,6 @@
       }
     ]
   },
-  "include": ["middleware.ts", "next-env.d.ts", "src/**/*", ".next/types/**/*.ts"],
+  "include": ["proxy.ts", "next-env.d.ts", "src/**/*", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

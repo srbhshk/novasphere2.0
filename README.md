@@ -13,7 +13,7 @@ This repository is a **pnpm + Turborepo monorepo**: shared libraries live under 
 | Area                 | What you get                                                                                                                                                                                                                                  |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Product identity** | `nova.config.ts` at the repo root defines domain, metrics, terminology, and per-role context. Injected into the agent on every request (static import, no extra DB round-trip).                                                               |
-| **Reference app**    | Next.js 15 App Router (`apps/web`): landing page, sign-in/sign-up (Better Auth), tenant-scoped dashboard with bento layout, copilot panel, GenUI tools.                                                                                       |
+| **Reference app**    | Next.js 16.2.x App Router (`apps/web`): landing page, sign-in/sign-up (Better Auth), tenant-scoped dashboard with bento layout, copilot panel, GenUI tools.                                                                                   |
 | **AI**               | Vercel AI SDK 6: `ToolLoopAgent` in `apps/web/src/lib/agent/`, streaming chat, tools such as `render_layout`, `ask_clarification`, etc. Default model: Ollama with OpenAI-compatible API (`OLLAMA_BASE_URL` / `OLLAMA_MODEL`).                |
 | **State**            | Zustand stores for layout, agent messages, tenant; `useChat` integrated with the agent store.                                                                                                                                                 |
 | **Data**             | TanStack Query hooks in `apps/web/src/hooks/`; API routes for metrics, tenant, agent, auth.                                                                                                                                                   |
@@ -26,7 +26,7 @@ This repository is a **pnpm + Turborepo monorepo**: shared libraries live under 
 
 ## Requirements
 
-- **Node.js** ≥ 20
+- **Node.js** ≥ 20.9 (required by Next.js 16)
 - **pnpm** ≥ 9
 - **Docker** (optional but recommended for the full stack demo)
 
@@ -168,7 +168,7 @@ pnpm format:check   # Prettier
 ```
 novasphere/
 ├── nova.config.ts          # Product + theme + feature flags (app layer only)
-├── apps/web/               # Next.js 15 reference application (only app that imports nova.config)
+├── apps/web/               # Next.js 16.2.x reference application (only app that imports nova.config)
 ├── packages/
 │   ├── tokens/             # Design tokens, Tailwind v4 bridge
 │   ├── db/                 # Drizzle, schemas, migrations
@@ -208,7 +208,7 @@ Breaking these boundaries breaks the intended layering and CI expectations.
 
 | Layer            | Technology                                                             |
 | ---------------- | ---------------------------------------------------------------------- |
-| Framework        | Next.js 15, App Router, RSC by default, Turbopack in dev               |
+| Framework        | Next.js 16.2.x, App Router, RSC by default, Turbopack (dev and build)  |
 | Language         | TypeScript 5 (strict; no `any`)                                        |
 | Styling          | Tailwind CSS v4, CSS Modules for glass; tokens in `@novasphere/tokens` |
 | UI base          | shadcn/ui (in `ui-glass`); extend by wrapping                          |

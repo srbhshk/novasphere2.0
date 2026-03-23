@@ -13,7 +13,7 @@ export type AuthGuardProps = {
 }
 
 /**
- * Client-side only — server protection via middleware.ts.
+ * Client-side only — server protection via apps/web proxy.ts.
  * Calls adapter.getSession() on mount and renders children when authenticated,
  * fallback when not, and optional loading state while resolving.
  */

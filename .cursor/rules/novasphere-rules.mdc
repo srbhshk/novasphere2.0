@@ -126,7 +126,7 @@ product_config:
 monorepo:
   tool: pnpm workspaces
   build_system: Turborepo
-  node_version: ">=20.0.0"
+  node_version: ">=20.9.0"
   package_manager: "pnpm >= 9"
 
   workspace_pattern: |
@@ -139,9 +139,9 @@ monorepo:
     "apps/web":
       npm_name: null
       description: >
-        The novasphere reference application. Next.js 15 App Router.
+        The novasphere reference application. Next.js 16.2.x App Router.
         Composes all packages. Deploys via Docker. NOT a template to fork.
-      framework: Next.js 15 (App Router, Turbopack)
+      framework: Next.js 16.2.x (App Router, Turbopack for dev and build)
       depends_on:
         - "@novasphere/tokens"
         - "@novasphere/ui-glass"
@@ -306,8 +306,8 @@ monorepo:
 stack:
 
   framework:
-    name: Next.js 15
-    version: "^15"
+    name: Next.js 16
+    version: "16.2.1"
     bundler: Turbopack (default for both dev and build)
     router: App Router only — never Pages Router
     rendering: >
@@ -439,7 +439,7 @@ stack:
     rules:
       - Better Auth NEVER imported inside any package.
       - AuthAdapter interface in ui-auth is the contract.
-      - Session validated in middleware.ts at edge before any route.
+      - Session validated in apps/web/proxy.ts (Node request proxy) before any route.
       - userId, userRole, tenantId injected as request headers.
       - Never trust client-provided identity claims.
 
@@ -571,7 +571,8 @@ structure: |
   │       │   │   ├── agent.store.ts
   │       │   │   └── tenant.store.ts
   │       │   └── styles/globals.css
-  │       ├── middleware.ts
+  │       ├── proxy.ts
+  │       ├── eslint.config.mjs
   │       ├── next.config.ts
   │       ├── postcss.config.mjs
   │       ├── tsconfig.json

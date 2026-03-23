@@ -1,0 +1,43 @@
+{
+  "name": "@novasphere/tokens",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": [
+    "./dist/tokens.css",
+    "./dist/themes/midnight-bloom.css",
+    "./dist/themes/forest-ember.css",
+    "./dist/themes/arctic-signal.css",
+    "./dist/themes/obsidian-gold.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./tokens.css": "./dist/tokens.css",
+    "./themes/midnight-bloom": "./dist/themes/midnight-bloom.css",
+    "./themes/forest-ember": "./dist/themes/forest-ember.css",
+    "./themes/arctic-signal": "./dist/themes/arctic-signal.css",
+    "./themes/obsidian-gold": "./dist/themes/obsidian-gold.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "^5.4.0"
+  }
+}

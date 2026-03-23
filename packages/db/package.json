@@ -1,0 +1,46 @@
+{
+  "name": "@novasphere/db",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.cjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/seed.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@libsql/client": "latest",
+    "@neondatabase/serverless": "latest",
+    "drizzle-orm": "latest",
+    "pg": "latest"
+  },
+  "devDependencies": {
+    "better-auth": "^1.5",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "drizzle-kit": "latest",
+    "tsup": "latest",
+    "tsx": "latest",
+    "typescript": "^5.4.0",
+    "vitest": "latest"
+  }
+}

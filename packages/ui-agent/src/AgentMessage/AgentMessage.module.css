@@ -1,0 +1,54 @@
+.ns-agent-message-user {
+  margin-left: auto;
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: var(--ns-radius-lg);
+  background: var(--ns-color-accent);
+  color: var(--ns-color-accent-foreground, #fff);
+  text-align: right;
+}
+
+.ns-agent-message-assistant {
+  max-width: 85%;
+  text-align: left;
+}
+
+.ns-agent-message-system {
+  text-align: center;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  color: var(--ns-color-muted);
+}
+
+.ns-agent-message-timestamp {
+  font-size: 0.7rem;
+  color: var(--ns-color-muted);
+  margin-top: 4px;
+}
+
+.ns-agent-message-streamingCursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--ns-color-text);
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ns-agent-message-toolChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  font-size: 0.75rem;
+  border-radius: var(--ns-radius-md);
+  background: var(--ns-glass-bg-subtle);
+  border: 1px solid var(--ns-color-border);
+  color: var(--ns-color-muted);
+}

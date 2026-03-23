@@ -1,0 +1,50 @@
+:root[data-theme='midnight-bloom'] {
+  /* Core */
+  --ns-color-bg: #0e1830;
+  --ns-color-surface: #192a56;
+  --ns-color-surface-2: #1e3366;
+  --ns-color-accent: #f7d794;
+  --ns-color-accent-2: #eda6a3;
+  --ns-color-accent-3: #8bb8d4;
+  --ns-color-text: #fcfbfb;
+  --ns-color-muted: #8a9bbf;
+  --ns-color-danger: #eda6a3;
+  --ns-color-border: rgba(247, 215, 148, 0.12);
+  --ns-color-border-hi: rgba(247, 215, 148, 0.22);
+
+  /* Opacity variants */
+  --ns-color-accent-10: rgba(247, 215, 148, 0.1);
+  --ns-color-accent-20: rgba(247, 215, 148, 0.2);
+  --ns-color-accent-2-20: rgba(237, 166, 163, 0.2);
+  --ns-color-accent-3-20: rgba(139, 184, 212, 0.2);
+  --ns-color-danger-20: rgba(237, 166, 163, 0.2);
+
+  /* Glass */
+  --ns-glass-bg-subtle: rgba(252, 251, 251, 0.03);
+  --ns-glass-bg-medium: rgba(252, 251, 251, 0.05);
+  --ns-glass-bg-strong: rgba(252, 251, 251, 0.07);
+  --ns-glass-highlight: rgba(247, 215, 148, 0.08);
+  --ns-glass-sheen: linear-gradient(
+    135deg,
+    rgba(247, 215, 148, 0.08) 0%,
+    transparent 50%
+  );
+
+  /* Shadows */
+  --ns-shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --ns-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --ns-shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --ns-shadow-sidebar: 1px 0 0 rgba(247, 215, 148, 0.08);
+  --ns-shadow-topbar: 0 1px 0 rgba(247, 215, 148, 0.08);
+  --ns-shadow-inset: inset 0 1px 0 rgba(247, 215, 148, 0.08);
+
+  /* Ambient orbs */
+  --ns-ambient-bg: #080e1e;
+  --ns-ambient-orb-1: rgba(247, 215, 148, 0.08);
+  --ns-ambient-orb-2: rgba(237, 166, 163, 0.07);
+  --ns-ambient-orb-3: rgba(25, 42, 86, 0.4);
+
+  /* Glow */
+  --ns-glow-accent: rgba(247, 215, 148, 0.3);
+  --ns-glow-accent-2: rgba(237, 166, 163, 0.2);
+}

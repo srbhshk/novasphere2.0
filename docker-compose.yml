@@ -1,0 +1,62 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - '3000:3000'
+    healthcheck:
+      # Runner image doesn't include curl; use Node fetch and follow redirects.
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "const c=new AbortController();setTimeout(()=>c.abort(),5000);fetch(''http://localhost:3000/'',{redirect:''follow'',signal:c.signal}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1));"',
+        ]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 20s
+    environment:
+      # server.js switches cwd to /app/apps/web, so DATABASE_URL must be absolute
+      DATABASE_URL: 'file:/app/data/app.db'
+      OLLAMA_BASE_URL: 'http://ollama:11434'
+      OLLAMA_MODEL: 'qwen2.5:0.5b'
+      BETTER_AUTH_SECRET: 'change-me-in-production-min-32-chars'
+      BETTER_AUTH_URL: 'http://localhost:3000'
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
+      NODE_ENV: 'production'
+    volumes:
+      - db_data:/app/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ['CMD-SHELL', 'ollama list >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    entrypoint: >
+      /bin/sh -c "
+        ollama serve &
+        SERVE_PID=$$! &&
+        echo '[novasphere] Waiting for Ollama to start...' &&
+        sleep 8 &&
+        echo '[novasphere] Pulling qwen2.5:0.5b (~400MB on first run)...' &&
+        ollama pull qwen2.5:0.5b &&
+        echo '[novasphere] Model ready.' &&
+        wait $$SERVE_PID
+      "
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  ollama_models:

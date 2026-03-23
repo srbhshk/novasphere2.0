@@ -1,0 +1,48 @@
+{
+  "name": "@novasphere/ui-charts",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19",
+    "recharts": "^2",
+    "lucide-react": "^0.473.0"
+  },
+  "dependencies": {
+    "@novasphere/tokens": "workspace:*",
+    "@novasphere/ui-glass": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "jsdom": "latest",
+    "tsup": "latest",
+    "typescript": "^5.4.0",
+    "vitest": "latest"
+  }
+}

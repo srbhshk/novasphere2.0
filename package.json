@@ -1,0 +1,66 @@
+{
+  "name": "novasphere-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo --filter web dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "verify": "turbo run build typecheck lint test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:push": "pnpm --filter @novasphere/db db:push",
+    "db:seed": "pnpm --filter @novasphere/db db:seed",
+    "db:studio": "pnpm --filter @novasphere/db db:studio",
+    "docker:demo": "docker compose up",
+    "docker:build": "docker compose build",
+    "changeset": "changeset",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,css,md,mdc,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@changesets/cli": "latest",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "latest",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^8.57.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "jsdom": "^22.1.0",
+    "prettier": "latest",
+    "prettier-plugin-tailwindcss": "latest",
+    "tsup": "^8.5.1",
+    "turbo": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "3.0.5",
+    "@radix-ui/react-slot": "^1.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@vitest/*": "3.0.5",
+      "vite": "5.4.14",
+      "vitest": "3.0.5",
+      "jsdom": "22.1.0",
+      "html-encoding-sniffer": "4.0.0",
+      "whatwg-url": "12.0.1"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

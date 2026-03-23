@@ -1,0 +1,54 @@
+.ns-glass-panel {
+  position: relative;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--ns-color-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--ns-radius-lg);
+  overflow: hidden;
+  background-color: transparent;
+  backdrop-filter: blur(var(--ns-blur-md, 20px));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.05),
+    var(--ns-shadow-panel, 0 18px 45px rgba(15, 23, 42, 0.55));
+}
+
+.ns-glass-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  z-index: 0;
+}
+
+.ns-glass-panel-subtle {
+  background: var(--ns-glass-bg-subtle, rgba(15, 23, 42, 0.6));
+}
+
+.ns-glass-panel-medium {
+  background: var(--ns-glass-bg-medium, rgba(15, 23, 42, 0.75));
+}
+
+.ns-glass-panel-strong {
+  background: var(--ns-glass-bg-strong, rgba(15, 23, 42, 0.9));
+}
+
+.ns-glass-panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ns-color-border, rgba(148, 163, 184, 0.35));
+}
+
+.ns-glass-panel-body {
+  padding: 16px 20px;
+}
+
+.ns-glass-panel-footer {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--ns-color-border, rgba(148, 163, 184, 0.35));
+}

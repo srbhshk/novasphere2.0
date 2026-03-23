@@ -1,0 +1,17 @@
+# Cursor rules are markdown-like; Prettier has no stable parser for .mdc
+.cursor/
+
+node_modules
+dist
+.next
+out
+.turbo
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+*.tsbuildinfo
+.changeset/*.md
+docs
+# shadcn/ui generated primitives — avoid churn (extend via wrappers)
+packages/ui-glass/src/ui/

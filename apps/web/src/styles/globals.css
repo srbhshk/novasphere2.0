@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+@import '@novasphere/tokens/tokens.css';
+@import '@novasphere/tokens/themes/midnight-bloom';
+@import '@novasphere/tokens/themes/forest-ember';
+@import '@novasphere/tokens/themes/arctic-signal';
+@import '@novasphere/tokens/themes/obsidian-gold';
+
+@import '@novasphere/ui-glass/dist/index.css';
+@import '@novasphere/ui-shell/dist/index.css';
+@import '@novasphere/ui-agent/dist/index.css';
+
+@source '../../../../packages/ui-*/src/**/*.{ts,tsx}';
+
+@theme {
+  --color-background: var(--ns-color-bg);
+  --color-foreground: var(--ns-color-text);
+  --color-muted: var(--ns-color-muted);
+  --color-border: var(--ns-color-border);
+  --color-accent: var(--ns-color-accent);
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+html {
+  transition:
+    background-color var(--ns-duration-slow) var(--ns-ease-smooth),
+    color var(--ns-duration-slow) var(--ns-ease-smooth);
+}
+
+body {
+  background: var(--ns-color-bg);
+  color: var(--ns-color-text);
+  transition:
+    background-color var(--ns-duration-slow) var(--ns-ease-smooth),
+    color var(--ns-duration-slow) var(--ns-ease-smooth);
+}

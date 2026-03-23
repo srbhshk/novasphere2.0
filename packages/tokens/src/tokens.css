@@ -1,0 +1,23 @@
+:root {
+  /* Blur */
+  --ns-blur-sm: 12px;
+  --ns-blur-md: 20px;
+  --ns-blur-lg: 32px;
+
+  /* Border radius */
+  --ns-radius-sm: 10px;
+  --ns-radius-md: 16px;
+  --ns-radius-lg: 24px;
+  --ns-radius-xl: 32px;
+
+  /* Motion */
+  --ns-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ns-ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ns-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ns-duration-fast: 150ms;
+  --ns-duration-base: 300ms;
+  --ns-duration-slow: 600ms;
+
+  /* Noise/grain overlay */
+  --ns-noise-opacity: 0.035;
+}

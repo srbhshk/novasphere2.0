@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment — NEVER commit secrets (templates like .env.example are tracked)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Certificates / keys (local TLS, API keys on disk)
+*.pem
+*.key
+
+# Database files & runtime data
+dev.db
+dev.db-shm
+dev.db-wal
+data/
+
+# Local documentation, analysis, reports (not part of the framework source tree)
+docs/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Testing & coverage
+playwright-report/
+test-results/
+coverage/
+blob-report/
+.vitest/
+
+# ESLint / Prettier caches
+.eslintcache
+.prettier-cache
+
+# Vercel
+.vercel/
+
+# Optional tooling
+.cache/
+.parcel-cache/
+*.pid
+.temp/
+tmp/
+
+# Changesets — commit config, not generated change files until release
+.changeset/*.md
+!.changeset/config.json
+
+# Editor (keep shared VS Code recommendations if added; ignore user-only settings)
+.vscode/settings.json
+.idea/

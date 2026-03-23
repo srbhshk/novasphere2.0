@@ -15,3 +15,4 @@ pnpm-lock.yaml
 docs
 # shadcn/ui generated primitives — avoid churn (extend via wrappers)
 packages/ui-glass/src/ui/
+apps/web/next-env.d.ts

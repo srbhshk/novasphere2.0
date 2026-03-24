@@ -1,6 +1,6 @@
 import type { ComponentType, ReactElement } from 'react'
 
-export type BentoColSpan = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12
+export type BentoColSpan = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
 
 export type BentoRowSpan = 1 | 2 | 3
 

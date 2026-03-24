@@ -6,6 +6,7 @@
 
 import { hashPassword } from 'better-auth/crypto'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import { sql } from 'drizzle-orm'
 import { db, resolveDatabaseUrl } from './client'
 import type * as schema from './schema'
 import {
@@ -54,6 +55,7 @@ async function seed(): Promise<void> {
         name: 'Admin User',
         email: 'admin@demo.com',
         emailVerified: true,
+        role: 'admin',
         createdAt: now,
         updatedAt: now,
       },
@@ -62,6 +64,7 @@ async function seed(): Promise<void> {
         name: 'CEO User',
         email: 'ceo@demo.com',
         emailVerified: true,
+        role: 'ceo',
         createdAt: now,
         updatedAt: now,
       },
@@ -70,11 +73,18 @@ async function seed(): Promise<void> {
         name: 'Engineer User',
         email: 'eng@demo.com',
         emailVerified: true,
+        role: 'engineer',
         createdAt: now,
         updatedAt: now,
       },
     ])
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: users.id,
+      set: {
+        role: sql`excluded.role`,
+        updatedAt: now,
+      },
+    })
 
   await sqliteDb
     .insert(accounts)

@@ -43,7 +43,7 @@ export default function Sidebar({
           )}
         </div>
 
-        <nav className="mt-2 flex flex-1 flex-col gap-1">
+        <nav className="mt-2 flex flex-1 flex-col items-center justify-center gap-1">
           {tenant.navItems.map((item) => (
             <NavItem
               key={item.id}
@@ -54,7 +54,9 @@ export default function Sidebar({
           ))}
         </nav>
 
-        {bottomSlot ? <div className="mt-auto">{bottomSlot}</div> : null}
+        {bottomSlot ? (
+          <div className="flex items-center justify-center">{bottomSlot}</div>
+        ) : null}
       </GlassPanel>
     </div>
   )

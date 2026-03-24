@@ -72,7 +72,7 @@ export function HeatmapChart({
                 const cell = data.find((c) => c.week === week && c.day === dayIndex)
                 const value = cell?.value ?? 0
                 const intensity = Math.min(1, Math.max(0, value / 100))
-                const bg = `rgba(56, 189, 248, ${0.1 + intensity * 0.7})`
+                const bg = `color-mix(in srgb, var(--ns-color-accent) ${Math.round((0.1 + intensity * 0.7) * 100)}%, transparent)`
 
                 return (
                   <div

@@ -1,7 +1,7 @@
 /**
  * Auth schema — managed by Better Auth via its Drizzle adapter.
  * DO NOT rename columns — Better Auth expects these exact names.
- * DO NOT add columns here — extend via Better Auth plugins instead.
+ * Additional fields declared here must also be declared in auth.ts via user.additionalFields.
  */
 
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
@@ -12,6 +12,7 @@ export const users = sqliteTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
+  role: text('role').notNull().default('viewer'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })

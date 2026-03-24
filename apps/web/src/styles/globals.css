@@ -5,9 +5,9 @@
 @import '@novasphere/tokens/themes/arctic-signal';
 @import '@novasphere/tokens/themes/obsidian-gold';
 
-@import '@novasphere/ui-glass/dist/index.css';
-@import '@novasphere/ui-shell/dist/index.css';
-@import '@novasphere/ui-agent/dist/index.css';
+@import '@novasphere/ui-glass/styles.css';
+@import '@novasphere/ui-shell/styles.css';
+@import '@novasphere/ui-agent/styles.css';
 
 @source '../../../../packages/ui-*/src/**/*.{ts,tsx}';
 

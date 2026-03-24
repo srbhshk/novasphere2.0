@@ -23,3 +23,9 @@ export type HeatmapCell = {
 }
 
 export type ChartVariant = 'default' | 'minimal' | 'compact'
+
+export type BarDataPoint = {
+  label: string
+  value: number
+  color?: string
+}

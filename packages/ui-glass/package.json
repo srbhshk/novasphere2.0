@@ -11,10 +11,11 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./dist/index.css": "./dist/index.css"
+    "./styles.css": "./src/styles.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "build": "tsup",
@@ -29,7 +30,8 @@
     "react-dom": "^18 || ^19"
   },
   "dependencies": {
-    "@novasphere/tokens": "workspace:*"
+    "@novasphere/tokens": "workspace:*",
+    "lucide-react": "^0.473.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "latest",

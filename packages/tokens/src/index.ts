@@ -1,6 +1,6 @@
-import { THEME_PRESETS, type ThemePreset } from './presets'
+import { THEME_PRESET_CANONICAL, THEME_PRESETS, type ThemePreset } from './presets'
 
-export { THEME_PRESETS, type ThemePreset }
+export { THEME_PRESET_CANONICAL, THEME_PRESETS, type ThemePreset }
 
 export const BLUR = {
   SM: 'var(--ns-blur-sm)',

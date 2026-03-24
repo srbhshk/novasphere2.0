@@ -1,29 +1,38 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
+import type { CopilotPanelProps } from '@novasphere/ui-agent'
 import { usePathname } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
-import { CopilotPanel } from '@novasphere/ui-agent'
-import { useMetricsList, type MetricsListResult } from '@/hooks/useMetricsList'
+import { GlassCard, Skeleton } from '@novasphere/ui-glass'
+import { useMetricsList } from '@/hooks/useMetricsList'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall } from '@/lib/agent/genui/tool-executor'
 import type { GenUiToolName } from '@/lib/agent/genui/tools'
-import { MODULE_REGISTRY } from './DashboardModules'
+import { MODULE_REGISTRY } from './modules/registry'
 import { novaConfig } from 'nova.config'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
+import type { MetricsListResult } from '@/hooks/useMetricsList'
 
-const CopilotPanelNoSsr = dynamic(() => Promise.resolve(CopilotPanel), { ssr: false })
+const CopilotPanelNoSsr = dynamic<CopilotPanelProps>(
+  () => import('@novasphere/ui-agent').then((m) => ({ default: m.CopilotPanel })),
+  { ssr: false },
+)
+
+// ---------------------------------------------------------------------------
+// Role-based default layouts
+// ---------------------------------------------------------------------------
 
 const CEO_DEFAULT_LAYOUT: BentoLayoutConfig = [
   {
-    id: 'm1',
+    id: 'c-m1',
     moduleId: 'metric-mrr',
     colSpan: 4,
     rowSpan: 1,
@@ -32,115 +41,241 @@ const CEO_DEFAULT_LAYOUT: BentoLayoutConfig = [
     order: 0,
   },
   {
-    id: 'm2',
-    moduleId: 'metric-churn',
+    id: 'c-m2',
+    moduleId: 'metric-arr',
     colSpan: 4,
     rowSpan: 1,
-    title: 'Churn',
+    title: 'ARR',
     visible: true,
     order: 1,
   },
   {
-    id: 'm3',
-    moduleId: 'metric-users',
+    id: 'c-m3',
+    moduleId: 'metric-nrr',
     colSpan: 4,
     rowSpan: 1,
-    title: 'Active Users',
+    title: 'Net Revenue Retention',
     visible: true,
     order: 2,
   },
   {
-    id: 'c1',
-    moduleId: 'chart-revenue',
-    colSpan: 8,
-    rowSpan: 2,
-    title: 'Revenue',
+    id: 'c-m4',
+    moduleId: 'metric-churn',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Churn Rate',
     visible: true,
     order: 3,
   },
   {
-    id: 'c2',
+    id: 'c-m5',
+    moduleId: 'metric-arpu',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'ARPU',
+    visible: true,
+    order: 4,
+  },
+  {
+    id: 'c-m6',
+    moduleId: 'metric-ltv',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Customer LTV',
+    visible: true,
+    order: 5,
+  },
+  {
+    id: 'c-m7',
+    moduleId: 'metric-conversion',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Trial Conversion',
+    visible: true,
+    order: 6,
+  },
+  {
+    id: 'c-c1',
+    moduleId: 'chart-revenue-comparison',
+    colSpan: 8,
+    rowSpan: 2,
+    title: 'Revenue vs Prior Year',
+    visible: true,
+    order: 7,
+  },
+  {
+    id: 'c-c2',
     moduleId: 'chart-pipeline',
     colSpan: 4,
     rowSpan: 2,
-    title: 'Pipeline',
+    title: 'Pipeline by Stage',
     visible: true,
-    order: 4,
+    order: 8,
+  },
+  {
+    id: 'c-t1',
+    moduleId: 'chart-top-customers',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'Top Customers by MRR',
+    visible: true,
+    order: 9,
+  },
+  {
+    id: 'c-t2',
+    moduleId: 'customer-table',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'Customer Health',
+    visible: true,
+    order: 10,
   },
 ]
 
 const ENGINEER_DEFAULT_LAYOUT: BentoLayoutConfig = [
   {
-    id: 'm1',
-    moduleId: 'metric-users',
-    colSpan: 4,
+    id: 'e-m1',
+    moduleId: 'metric-api-latency',
+    colSpan: 3,
     rowSpan: 1,
-    title: 'Active Users',
+    title: 'API Latency',
     visible: true,
     order: 0,
   },
   {
-    id: 'c1',
-    moduleId: 'chart-activity',
-    colSpan: 8,
-    rowSpan: 2,
-    title: 'Activity',
+    id: 'e-m2',
+    moduleId: 'metric-error-rate',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Error Rate',
     visible: true,
     order: 1,
   },
   {
-    id: 'a1',
-    moduleId: 'activity-feed',
-    colSpan: 4,
-    rowSpan: 2,
-    title: 'Recent Activity',
+    id: 'e-m3',
+    moduleId: 'metric-uptime',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Uptime',
     visible: true,
     order: 2,
+  },
+  {
+    id: 'e-m4',
+    moduleId: 'metric-request-volume',
+    colSpan: 3,
+    rowSpan: 1,
+    title: 'Requests / Day',
+    visible: true,
+    order: 3,
+  },
+  {
+    id: 'e-c1',
+    moduleId: 'chart-response-time',
+    colSpan: 8,
+    rowSpan: 2,
+    title: 'Response Time (24h)',
+    visible: true,
+    order: 4,
+  },
+  {
+    id: 'e-c2',
+    moduleId: 'chart-error-breakdown',
+    colSpan: 4,
+    rowSpan: 2,
+    title: 'Errors by Endpoint',
+    visible: true,
+    order: 5,
+  },
+  {
+    id: 'e-f1',
+    moduleId: 'deployment-log',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'Recent Deployments',
+    visible: true,
+    order: 6,
+  },
+  {
+    id: 'e-f2',
+    moduleId: 'system-alerts',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'System Alerts',
+    visible: true,
+    order: 7,
   },
 ]
 
 const ADMIN_DEFAULT_LAYOUT: BentoLayoutConfig = [
   {
-    id: 'm1',
+    id: 'a-m1',
     moduleId: 'metric-users',
     colSpan: 4,
     rowSpan: 1,
-    title: 'Active Users',
+    title: 'Total Users',
     visible: true,
     order: 0,
   },
   {
-    id: 'm2',
-    moduleId: 'metric-mrr',
+    id: 'a-m2',
+    moduleId: 'metric-new-signups',
     colSpan: 4,
     rowSpan: 1,
-    title: 'MRR',
+    title: 'New Signups / Week',
     visible: true,
     order: 1,
   },
   {
-    id: 'a1',
-    moduleId: 'activity-feed',
+    id: 'a-m3',
+    moduleId: 'metric-active-orgs',
     colSpan: 4,
-    rowSpan: 2,
-    title: 'Activity',
+    rowSpan: 1,
+    title: 'Active Orgs',
     visible: true,
     order: 2,
   },
   {
-    id: 'c1',
-    moduleId: 'chart-pipeline',
-    colSpan: 12,
+    id: 'a-c1',
+    moduleId: 'chart-plan-distribution',
+    colSpan: 4,
     rowSpan: 2,
-    title: 'Pipeline',
+    title: 'Plan Distribution',
     visible: true,
     order: 3,
+  },
+  {
+    id: 'a-c2',
+    moduleId: 'chart-user-growth',
+    colSpan: 8,
+    rowSpan: 2,
+    title: 'User Growth',
+    visible: true,
+    order: 4,
+  },
+  {
+    id: 'a-f1',
+    moduleId: 'activity-feed',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'Activity Feed',
+    visible: true,
+    order: 5,
+  },
+  {
+    id: 'a-t1',
+    moduleId: 'pipeline-table',
+    colSpan: 6,
+    rowSpan: 2,
+    title: 'Active Pipeline',
+    visible: true,
+    order: 6,
   },
 ]
 
 const VIEWER_DEFAULT_LAYOUT: BentoLayoutConfig = [
   {
-    id: 'm1',
+    id: 'v-m1',
     moduleId: 'metric-mrr',
     colSpan: 6,
     rowSpan: 1,
@@ -149,7 +284,7 @@ const VIEWER_DEFAULT_LAYOUT: BentoLayoutConfig = [
     order: 0,
   },
   {
-    id: 'm2',
+    id: 'v-m2',
     moduleId: 'metric-users',
     colSpan: 6,
     rowSpan: 1,
@@ -158,71 +293,37 @@ const VIEWER_DEFAULT_LAYOUT: BentoLayoutConfig = [
     order: 1,
   },
   {
-    id: 'c1',
-    moduleId: 'chart-revenue',
-    colSpan: 12,
-    rowSpan: 2,
-    title: 'Revenue',
-    visible: true,
-    order: 2,
-  },
-]
-
-const BOARD_MEETING_LAYOUT: BentoLayoutConfig = [
-  {
-    id: 'bm-1',
-    moduleId: 'metric-mrr',
-    colSpan: 4,
-    rowSpan: 1,
-    title: 'MRR',
-    visible: true,
-    order: 0,
-  },
-  {
-    id: 'bm-2',
-    moduleId: 'metric-churn',
-    colSpan: 4,
-    rowSpan: 1,
-    title: 'Churn',
-    visible: true,
-    order: 1,
-  },
-  {
-    id: 'bm-3',
-    moduleId: 'metric-users',
-    colSpan: 4,
-    rowSpan: 1,
-    title: 'Active Users',
-    visible: true,
-    order: 2,
-  },
-  {
-    id: 'bm-4',
+    id: 'v-c1',
     moduleId: 'chart-revenue',
     colSpan: 8,
     rowSpan: 2,
     title: 'Revenue',
     visible: true,
-    order: 3,
+    order: 2,
   },
   {
-    id: 'bm-5',
+    id: 'v-c2',
     moduleId: 'chart-pipeline',
     colSpan: 4,
     rowSpan: 2,
     title: 'Pipeline',
     visible: true,
+    order: 3,
+  },
+  {
+    id: 'v-f1',
+    moduleId: 'activity-feed',
+    colSpan: 12,
+    rowSpan: 2,
+    title: 'Activity Feed',
+    visible: true,
     order: 4,
   },
 ]
 
-function isBoardMeetingPrompt(text: string): boolean {
-  return text.trim().toLowerCase() === 'show me what matters for the board meeting'
-}
-
-function isClarificationPrompt(text: string): boolean {
-  return text.trim().toLowerCase() === 'make this better'
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function normalizeAgentRole(
   role: string | undefined,
@@ -291,6 +392,10 @@ function extractToolCallsFromMessage(
   return results
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard page
+// ---------------------------------------------------------------------------
+
 export default function DashboardPage(): React.JSX.Element {
   const pathname = usePathname() ?? '/'
   const { data: sessionData, isPending } = useSession()
@@ -310,14 +415,10 @@ export default function DashboardPage(): React.JSX.Element {
   const isOpen = useAgentPanelStore((s) => s.isOpen)
   const setOpen = useAgentPanelStore((s) => s.setOpen)
   const processedToolRef = useRef<Set<string>>(new Set())
-  const suppressNextRenderLayoutToolRef = useRef<boolean>(false)
   const anomalyExplainedRef = useRef<boolean>(false)
-  const [localLayoutNoticeAt, setLocalLayoutNoticeAt] = useState<number | null>(null)
-  const [localClarificationQuestionAt, setLocalClarificationQuestionAt] = useState<
-    number | null
-  >(null)
 
-  const { data: metricsData, isPending: metricsPending } = useMetricsList()
+  // Use legacy hook for anomaly detection only (role-scoped data via useDashboardMetrics in modules)
+  const { data: metricsData, isPending: metricsPending } = useMetricsList(agentRole)
   const anomalyMetric = useMemo(
     () => (metricsData != null ? getFirstAnomalousMetric(metricsData) : null),
     [metricsData],
@@ -340,9 +441,7 @@ export default function DashboardPage(): React.JSX.Element {
     [userId, agentRole, tenantId, pathname],
   )
 
-  const { messages, sendMessage, status } = useChat({
-    transport,
-  })
+  const { messages, sendMessage, status } = useChat({ transport })
 
   useEffect(() => {
     setAdapterType('ollama')
@@ -350,48 +449,27 @@ export default function DashboardPage(): React.JSX.Element {
     setAdapterStatus('idle')
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
 
+  // Auto-explain anomaly once on load
   useEffect(() => {
-    if (isPending) {
-      return
-    }
-    const current = useLayoutStore.getState().layout
-    if (current == null) {
-      setLayout(getDefaultLayoutForRole(agentRole))
-    }
-  }, [isPending, agentRole, setLayout])
-
-  useEffect(() => {
-    if (anomalyExplainedRef.current) {
-      return
-    }
-    if (metricsPending) {
-      return
-    }
-    if (anomalyMetric == null) {
-      return
-    }
-    if (isGenerating) {
-      return
-    }
-    if (status === 'streaming' || status === 'submitted') {
-      return
-    }
-
+    if (anomalyExplainedRef.current) return
+    if (metricsPending || anomalyMetric == null || isGenerating) return
+    if (status === 'streaming' || status === 'submitted') return
     anomalyExplainedRef.current = true
-
-    const prompt = `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}`
-    sendMessage({ text: prompt })
+    sendMessage({
+      text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}`,
+    })
   }, [metricsPending, anomalyMetric, isGenerating, status, sendMessage])
 
+  // Compose initial layout from the AI on first load.
+  // LLM is the controller — it decides the layout for this role.
+  // Falls back to the static role default only when the model is unavailable.
   useEffect(() => {
-    if (isPending) {
-      return
-    }
-
+    if (isPending) return
     const ac = new AbortController()
 
     void (async () => {
       setGenerating(true)
+      let aiLayoutApplied = false
       try {
         const res = await fetch('/api/agent', {
           method: 'POST',
@@ -409,36 +487,32 @@ export default function DashboardPage(): React.JSX.Element {
             composeInitialLayout: true,
           }),
         })
-        if (!res.ok) {
-          return
+        if (res.ok) {
+          const data: unknown = await res.json()
+          if (isRecord(data)) {
+            const cards = data['cards']
+            if (Array.isArray(cards) && cards.length > 0) {
+              executeToolCall('render_layout', { cards }, {
+                layoutStore: {
+                  setLayout: useLayoutStore.getState().setLayout,
+                  getLayout: useLayoutStore.getState().getLayout,
+                },
+                agentStore: {
+                  setSuggestions: useAgentPanelStore.getState().setSuggestions,
+                },
+              } as Parameters<typeof executeToolCall>[2])
+              aiLayoutApplied = true
+            }
+          }
         }
-        const data: unknown = await res.json()
-        if (!isRecord(data)) {
-          return
-        }
-        const cards = data['cards']
-        if (!Array.isArray(cards) || cards.length === 0) {
-          return
-        }
-        const layoutStore = {
-          setLayout: useLayoutStore.getState().setLayout,
-          getLayout: useLayoutStore.getState().getLayout,
-        }
-        const agentStore = {
-          setSuggestions: useAgentPanelStore.getState().setSuggestions,
-        }
-        executeToolCall('render_layout', { cards }, {
-          layoutStore,
-          agentStore,
-        } as Parameters<typeof executeToolCall>[2])
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return
-        }
-        if (err instanceof Error && err.name === 'AbortError') {
-          return
-        }
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (err instanceof Error && err.name === 'AbortError') return
       } finally {
+        // Fallback: if the LLM did not produce a layout, use the static role default
+        if (!aiLayoutApplied) {
+          useLayoutStore.getState().setLayout(getDefaultLayoutForRole(agentRole))
+        }
         setGenerating(false)
       }
     })()
@@ -449,12 +523,14 @@ export default function DashboardPage(): React.JSX.Element {
     }
   }, [isPending, agentRole, pathname, userId, tenantId, setGenerating])
 
+  // Mirror streaming status to agent store
   useEffect(() => {
     setAdapterStatus(
       status === 'streaming' ? 'streaming' : status === 'submitted' ? 'thinking' : 'idle',
     )
   }, [status, setAdapterStatus])
 
+  // Apply tool calls from AI SDK messages
   useEffect(() => {
     const layoutStore = {
       setLayout: (l: Parameters<typeof setLayout>[0]) => setLayout(l),
@@ -467,16 +543,11 @@ export default function DashboardPage(): React.JSX.Element {
       const m = msg as unknown as Record<string, unknown>
       const id = m['id'] as string | undefined
       if (!id) continue
-
       const toolCalls = extractToolCallsFromMessage(m)
       for (const { toolCallId, toolName, args } of toolCalls) {
         const key = `${id}-${toolCallId}-${toolName}`
         if (processedToolRef.current.has(key)) continue
         processedToolRef.current.add(key)
-        if (suppressNextRenderLayoutToolRef.current && toolName === 'render_layout') {
-          suppressNextRenderLayoutToolRef.current = false
-          continue
-        }
         executeToolCall(
           toolName as GenUiToolName,
           args,
@@ -486,10 +557,10 @@ export default function DashboardPage(): React.JSX.Element {
     }
   }, [messages, setLayout, getLayout, setSuggestions])
 
-  const displayLayout = layout ?? getDefaultLayoutForRole(agentRole)
   const chatBusy = status === 'streaming' || status === 'submitted'
   const isLoading = chatBusy || isGenerating
 
+  // Extract streaming text for the copilot panel
   const streamingContent = (() => {
     const last = messages[messages.length - 1]
     if (!last || typeof last !== 'object') return undefined
@@ -506,6 +577,7 @@ export default function DashboardPage(): React.JSX.Element {
     return typeof text === 'string' ? text : undefined
   })()
 
+  // Normalize AI SDK v6 UIMessage[] → AgentMessage[] for CopilotPanel
   const normalizedMessages = messages.map((m) => {
     const msg = m as unknown as Record<string, unknown>
     const parts = msg['parts'] ?? []
@@ -549,56 +621,54 @@ export default function DashboardPage(): React.JSX.Element {
     }
   })
 
-  if (localLayoutNoticeAt != null) {
-    const alreadyHasRenderLayoutTool = normalizedMessages.some((m) =>
-      (m.toolCalls ?? []).some((tc) => tc.toolName === 'render_layout'),
-    )
-    if (!alreadyHasRenderLayoutTool) {
-      normalizedMessages.push({
-        id: `local-layout-${localLayoutNoticeAt}`,
-        role: 'assistant',
-        content: 'Updated the dashboard based on your selection.',
-        timestamp: localLayoutNoticeAt,
-        toolCalls: [
-          {
-            id: `local-render-layout-${localLayoutNoticeAt}`,
-            toolName: 'render_layout',
-            args: {},
-            result: { source: 'local-fallback' },
-          },
-        ],
-      })
-    }
-  }
-
-  if (localClarificationQuestionAt != null) {
-    const alreadyHasClarification = normalizedMessages.some(
-      (m) => m.id === `local-clarification-${localClarificationQuestionAt}`,
-    )
-    if (!alreadyHasClarification) {
-      normalizedMessages.push({
-        id: `local-clarification-${localClarificationQuestionAt}`,
-        role: 'assistant',
-        content: 'What are you optimising for right now?',
-        timestamp: localClarificationQuestionAt,
-        toolCalls: undefined,
-      })
-    }
-  }
-
-  const bentoWrapClass = isGenerating
-    ? 'min-w-0 flex-1 opacity-80 transition-opacity duration-300'
-    : 'min-w-0 flex-1 transition-opacity duration-300'
-
   return (
     <div className="flex h-full w-full gap-4">
-      <div className={bentoWrapClass}>
-        <BentoGrid
-          layout={displayLayout}
-          modules={MODULE_REGISTRY}
-          onReorder={(next) => setLayout(next)}
-          className="h-full w-full"
-        />
+      <div className="min-w-0 flex-1 transition-opacity duration-300">
+        {layout == null && isGenerating ? (
+          // Skeleton state: LLM is composing the initial layout
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+              gridAutoRows: 'minmax(120px, auto)',
+              gap: '16px',
+              width: '100%',
+            }}
+          >
+            {(
+              [
+                { cols: 4, rows: 1 },
+                { cols: 4, rows: 1 },
+                { cols: 4, rows: 1 },
+                { cols: 8, rows: 2 },
+                { cols: 4, rows: 2 },
+                { cols: 6, rows: 2 },
+                { cols: 6, rows: 2 },
+              ] as Array<{ cols: number; rows: number }>
+            ).map((cell, i) => (
+              <GlassCard
+                key={i}
+                variant="subtle"
+                className="flex h-full flex-col gap-3 p-4"
+                style={{
+                  gridColumn: `span ${cell.cols} / span ${cell.cols}`,
+                  gridRow: `span ${cell.rows} / span ${cell.rows}`,
+                }}
+              >
+                <Skeleton rounded="md" className="h-4 w-1/3" />
+                <Skeleton rounded="md" className="h-8 w-2/3" />
+                {cell.rows > 1 && <Skeleton rounded="md" className="flex-1" />}
+              </GlassCard>
+            ))}
+          </div>
+        ) : (
+          <BentoGrid
+            layout={layout ?? getDefaultLayoutForRole(agentRole)}
+            modules={MODULE_REGISTRY}
+            onReorder={(next) => setLayout(next)}
+            className="h-full w-full"
+          />
+        )}
       </div>
       <div
         className={`shrink-0 transition-all duration-300 ${isOpen ? 'w-[380px]' : 'w-auto'}`}
@@ -617,43 +687,10 @@ export default function DashboardPage(): React.JSX.Element {
                 ? 'thinking'
                 : 'idle'
           }
-          onSend={(text) => {
-            if (isBoardMeetingPrompt(text)) {
-              setLayout(BOARD_MEETING_LAYOUT)
-              setLocalLayoutNoticeAt(Date.now())
-              setLocalClarificationQuestionAt(null)
-            }
-            if (isClarificationPrompt(text)) {
-              const options: string[] = [
-                'Board presentation',
-                'Daily standup',
-                'Investor review',
-              ]
-              const chips: SuggestionChip[] = options.map((option, index) => ({
-                id: `clarification-${index}`,
-                label: option,
-                action: option,
-              }))
-              setSuggestions(chips)
-              setLocalClarificationQuestionAt(Date.now())
-              return
-            }
+          onSend={(text: string) => {
             sendMessage({ text })
           }}
-          onSuggestionSelect={(chip) => {
-            const nextLayout =
-              chip.action === 'Board presentation'
-                ? BOARD_MEETING_LAYOUT
-                : chip.action === 'Daily standup'
-                  ? ENGINEER_DEFAULT_LAYOUT
-                  : chip.action === 'Investor review'
-                    ? CEO_DEFAULT_LAYOUT
-                    : null
-            if (nextLayout != null) {
-              setLayout(nextLayout)
-              setLocalLayoutNoticeAt(Date.now())
-            }
-            suppressNextRenderLayoutToolRef.current = true
+          onSuggestionSelect={(chip: SuggestionChip) => {
             sendMessage({ text: chip.action })
             setSuggestions([])
           }}

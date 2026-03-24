@@ -1,22 +1,32 @@
 import { NextResponse } from 'next/server'
-import {
-  MOCK_MRR,
-  MOCK_CHURN,
-  MOCK_ACTIVE_USERS,
-  MOCK_REVENUE_HISTORY,
-  MOCK_PIPELINE_STAGES,
-  MOCK_ACTIVITY_HEATMAP,
-  MOCK_SPARKLINE_DATA,
-} from '@/mocks/metrics.mock'
+import { CEO_METRICS } from '@/mocks/ceo.mock'
+import { ENGINEER_METRICS } from '@/mocks/engineer.mock'
+import { ADMIN_METRICS } from '@/mocks/admin.mock'
+import { VIEWER_METRICS } from '@/mocks/viewer.mock'
 
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({
-    mrr: MOCK_MRR,
-    churn: MOCK_CHURN,
-    activeUsers: MOCK_ACTIVE_USERS,
-    revenueHistory: MOCK_REVENUE_HISTORY,
-    pipelineStages: MOCK_PIPELINE_STAGES,
-    activityHeatmap: MOCK_ACTIVITY_HEATMAP,
-    sparklineData: MOCK_SPARKLINE_DATA,
-  })
+function resolveRole(roleHeader: string | null): 'ceo' | 'engineer' | 'admin' | 'viewer' {
+  if (
+    roleHeader === 'ceo' ||
+    roleHeader === 'engineer' ||
+    roleHeader === 'admin' ||
+    roleHeader === 'viewer'
+  ) {
+    return roleHeader
+  }
+  return 'viewer'
+}
+
+export async function GET(request: Request): Promise<NextResponse> {
+  const role = resolveRole(request.headers.get('x-user-role'))
+
+  const payload =
+    role === 'ceo'
+      ? CEO_METRICS
+      : role === 'engineer'
+        ? ENGINEER_METRICS
+        : role === 'admin'
+          ? ADMIN_METRICS
+          : VIEWER_METRICS
+
+  return NextResponse.json(payload)
 }

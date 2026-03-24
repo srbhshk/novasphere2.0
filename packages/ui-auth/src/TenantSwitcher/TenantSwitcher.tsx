@@ -27,10 +27,10 @@ export function TenantSwitcher({
         <button
           type="button"
           aria-label="Switch tenant"
-          className={`flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 hover:bg-white/10 ${className != null ? className : ''}`}
+          className={`flex items-center gap-2 rounded-lg border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] px-3 py-2 text-sm text-[color:var(--ns-color-text)] hover:border-[color:var(--ns-color-border-hi)] hover:bg-[color:var(--ns-glass-bg-medium)] ${className != null ? className : ''}`}
         >
           <span>{current?.name ?? 'Tenant'}</span>
-          <ChevronDown className="h-4 w-4 text-white/60" />
+          <ChevronDown className="h-4 w-4 text-[color:var(--ns-color-muted)]" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -41,7 +41,7 @@ export function TenantSwitcher({
                 key={tenant.id}
                 type="button"
                 onClick={() => onSwitch(tenant.id)}
-                className="w-full rounded px-2 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                className="w-full rounded px-2 py-2 text-left text-sm text-[color:var(--ns-color-text)] hover:bg-[color:var(--ns-glass-bg-subtle)]"
               >
                 {tenant.name}
               </button>

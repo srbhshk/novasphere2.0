@@ -13,14 +13,6 @@ export type SidebarProps = {
   bottomSlot?: React.ReactNode
 }
 
-function getTenantInitials(tenantName: string): string {
-  const trimmed = tenantName.trim()
-  if (trimmed.length === 0) {
-    return 'NS'
-  }
-  return trimmed.slice(0, 2).toUpperCase()
-}
-
 export default function Sidebar({
   tenant,
   currentPath,
@@ -43,13 +35,15 @@ export default function Sidebar({
               className="h-8 w-8 rounded-md object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[color:var(--ns-glass-bg-subtle)] text-xs font-semibold text-[color:var(--ns-color-text)]">
-              {getTenantInitials(tenant.name)}
-            </div>
+            <img
+              alt="Novasphere logo"
+              src="/branding/novasphere-mark.png"
+              className="h-8 w-8 rounded-md object-cover"
+            />
           )}
         </div>
 
-        <nav className="mt-2 flex flex-1 flex-col gap-1">
+        <nav className="mt-2 flex flex-1 flex-col items-center justify-center gap-1">
           {tenant.navItems.map((item) => (
             <NavItem
               key={item.id}
@@ -60,7 +54,9 @@ export default function Sidebar({
           ))}
         </nav>
 
-        {bottomSlot ? <div className="mt-auto">{bottomSlot}</div> : null}
+        {bottomSlot ? (
+          <div className="flex items-center justify-center">{bottomSlot}</div>
+        ) : null}
       </GlassPanel>
     </div>
   )

@@ -1,9 +1,15 @@
+/**
+ * Legacy mock exports kept for backward compatibility with useMetricsList.
+ * New code should use the role-scoped mocks (ceo.mock.ts, engineer.mock.ts, etc.)
+ * and the /api/metrics route.
+ */
 import type {
   SparklineDataPoint,
   DonutSegment,
   AreaDataPoint,
   HeatmapCell,
 } from '@novasphere/ui-charts'
+import { buildHeatmap } from './shared.mock'
 
 export const MOCK_MRR = {
   value: 847_500,
@@ -15,7 +21,7 @@ export const MOCK_CHURN = {
   value: 7.8,
   trend: 4.2,
   deltaDirection: 'up' as const,
-  // Used to trigger the automatic anomaly explanation flow.
+  // Drives the automatic anomaly explanation flow.
   anomaly: true as const,
 }
 
@@ -41,22 +47,9 @@ export const MOCK_PIPELINE_STAGES: DonutSegment[] = [
   { id: 'closed', label: 'Closed', value: 46 },
 ]
 
-function generateHeatmapData(): HeatmapCell[] {
-  const cells: HeatmapCell[] = []
-  const days: HeatmapCell['day'][] = [0, 1, 2, 3, 4, 5, 6]
-  for (let week = 0; week < 12; week++) {
-    for (const day of days) {
-      cells.push({
-        week,
-        day,
-        value: Math.floor(Math.random() * 100),
-      })
-    }
-  }
-  return cells
-}
-
-export const MOCK_ACTIVITY_HEATMAP = generateHeatmapData()
+export const MOCK_ACTIVITY_HEATMAP: HeatmapCell[] = buildHeatmap(0).map(
+  (c): HeatmapCell => ({ week: c.week, day: c.day, value: c.value }),
+)
 
 export const MOCK_SPARKLINE_DATA: SparklineDataPoint[] = [
   { value: 72 },

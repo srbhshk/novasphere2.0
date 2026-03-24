@@ -1,13 +1,13 @@
 # apps/web — novasphere reference application
 
-Next.js 15 (App Router) application that composes every `@novasphere/*` package. This is the **reference implementation**, not a generic template to fork blindly—copy patterns, respect package boundaries.
+Next.js 16.2.x (App Router, Turbopack for `next dev` and `next build`) application that composes every `@novasphere/*` package. This is the **reference implementation**, not a generic template to fork blindly—copy patterns, respect package boundaries.
 
 ---
 
 ## Role in the monorepo
 
 - **Imports** `nova.config.ts` (repo root) via agent context and server code only—packages must not import it.
-- **Owns** Vercel AI SDK (`ai`, `@ai-sdk/react`, `@ai-sdk/openai`), Better Auth, middleware, API routes, Zustand stores, TanStack Query hooks.
+- **Owns** Vercel AI SDK (`ai`, `@ai-sdk/react`, `@ai-sdk/openai`), Better Auth, `proxy.ts` (session gate), API routes, Zustand stores, TanStack Query hooks.
 - **Deploys** as standalone output (`next.config.ts`) inside Docker (`docker/Dockerfile`).
 
 ---
@@ -20,7 +20,7 @@ Next.js 15 (App Router) application that composes every `@novasphere/*` package.
 | `pnpm build`     | Production build                                                         |
 | `pnpm start`     | Run production server locally                                            |
 | `pnpm typecheck` | `tsc --noEmit`                                                           |
-| `pnpm lint`      | ESLint on `src/` and `middleware.ts`                                     |
+| `pnpm lint`      | ESLint (flat config) on `src/` and `proxy.ts`                            |
 
 ---
 
@@ -47,7 +47,7 @@ See root [README.md](../../README.md) for variable meanings. Server-side validat
 | `src/lib/auth/`                      | Better Auth server + client                                                          |
 | `src/store/`                         | Zustand: layout, agent, tenant                                                       |
 | `src/hooks/`                         | TanStack Query data hooks                                                            |
-| `middleware.ts`                      | Session; injects identity headers for downstream routes                              |
+| `proxy.ts`                           | Session gate (Node); injects identity headers for downstream routes                  |
 
 ---
 

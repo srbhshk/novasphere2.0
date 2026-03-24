@@ -7,7 +7,13 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'esnext',
-  external: ['react', 'react-dom', '@novasphere/tokens', '@radix-ui/react-slot'],
+  external: [
+    'react',
+    'react-dom',
+    '@novasphere/tokens',
+    '@radix-ui/react-slot',
+    'lucide-react',
+  ],
   esbuildOptions(options) {
     options.banner = {
       js: '"use client";',

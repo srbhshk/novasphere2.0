@@ -4,6 +4,7 @@ export type {
   AreaDataPoint,
   HeatmapCell,
   ChartVariant,
+  BarDataPoint,
 } from './chart.types'
 
 export type { ChartSkeletonProps } from './ChartSkeleton/ChartSkeleton'
@@ -18,3 +19,5 @@ export type { AreaChartProps } from './AreaChart/AreaChart'
 export { AreaChart } from './AreaChart/AreaChart'
 export type { HeatmapChartProps } from './HeatmapChart/HeatmapChart'
 export { HeatmapChart } from './HeatmapChart/HeatmapChart'
+export type { BarChartProps } from './BarChart/BarChart'
+export { BarChart } from './BarChart/BarChart'

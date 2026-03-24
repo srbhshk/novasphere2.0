@@ -19,5 +19,5 @@
   --ns-duration-slow: 600ms;
 
   /* Noise/grain overlay */
-  --ns-noise-opacity: 0.035;
+  --ns-noise-opacity: 0.1;
 }

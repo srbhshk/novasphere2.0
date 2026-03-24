@@ -19,6 +19,9 @@
       "cache": false,
       "persistent": true
     },
+    "clean": {
+      "cache": false
+    },
     "db:push": {
       "cache": false
     },

@@ -1,6 +1,21 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+/**
+ * Next.js 16 proxy — the successor to the middleware.ts convention.
+ * Runs in Node.js runtime — no edge runtime restrictions.
+ *
+ * Responsibilities:
+ * - Redirect unauthenticated users to /sign-in for protected routes.
+ * - Forward requests as-is for public routes and authenticated users.
+ *
+ * Role injection is NOT done here by design: every client-initiated
+ * API call (TanStack Query hooks, DefaultChatTransport, fetch in
+ * dashboard/page.tsx) explicitly includes x-user-role from the
+ * client's Better Auth session. The session now correctly contains
+ * the user's role via user.additionalFields (see auth.ts + seed.ts).
+ */
+
 const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/api/auth']
 
 function isPublicPath(pathname: string): boolean {
@@ -9,13 +24,13 @@ function isPublicPath(pathname: string): boolean {
 
 function getSessionToken(request: NextRequest): string | null {
   const cookieToken = request.cookies.get('better-auth.session_token')?.value
-  if (cookieToken) {
+  if (cookieToken != null) {
     return cookieToken
   }
   return request.cookies.get('__Secure-better-auth.session_token')?.value ?? null
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl
   const token = getSessionToken(request)
   const authenticated = Boolean(token)
@@ -25,14 +40,7 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.redirect(destination)
   }
 
-  const response = NextResponse.next()
-  if (authenticated) {
-    response.headers.set('x-user-id', 'session-user')
-    response.headers.set('x-user-role', 'viewer')
-    response.headers.set('x-tenant-id', 'demo')
-  }
-
-  return response
+  return NextResponse.next()
 }
 
 export const config = {

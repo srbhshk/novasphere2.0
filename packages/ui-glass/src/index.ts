@@ -47,3 +47,17 @@ export {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+
+export {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table'
+
+export type { DataTableProps, ColumnDef, SortDirection } from './DataTable/DataTable'
+export { DataTable } from './DataTable/DataTable'

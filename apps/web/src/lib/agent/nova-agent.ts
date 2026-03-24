@@ -1,7 +1,7 @@
 import type { ModelMessage } from 'ai'
 import { generateText, stepCountIs, streamText } from 'ai'
 import type { AgentContext, UserRole, ProductConfig } from '@novasphere/agent-core'
-import { getSystemPrompt } from '../../../../../packages/agent-core/src/prompts'
+import { getSystemPrompt } from '@novasphere/agent-core'
 import { z } from 'zod'
 import { getActiveModel } from './models'
 import { genUiTools } from './genui/tools'
@@ -75,13 +75,35 @@ function buildInitialLayoutSystemInstructions(context: AgentContext): string {
   const role = context.userRole
   const roleHint =
     role === 'ceo'
-      ? 'For this request you MUST call the render_layout tool exactly once. Prioritise executive modules: metric-mrr, metric-churn, metric-users, chart-revenue, chart-pipeline.'
+      ? [
+          'For this request you MUST call render_layout exactly once.',
+          'Compose a CEO executive layout with these module IDs in this order:',
+          '  Row 1 (colSpan 4 each, rowSpan 1): metric-mrr, metric-arr, metric-nrr',
+          '  Row 2 (colSpan 3 each, rowSpan 1): metric-churn, metric-arpu, metric-ltv, metric-conversion',
+          '  Row 3 (colSpan 8+4, rowSpan 2): chart-revenue-comparison, chart-pipeline',
+          '  Row 4 (colSpan 6+6, rowSpan 2): chart-top-customers, customer-table',
+        ].join('\n')
       : role === 'engineer'
-        ? 'For this request you MUST call the render_layout tool exactly once. Prioritise operational modules: chart-activity, activity-feed, metric-users, chart-sparkline.'
+        ? [
+            'For this request you MUST call render_layout exactly once.',
+            'Compose an Engineer operational layout with these module IDs:',
+            '  Row 1 (colSpan 3 each, rowSpan 1): metric-api-latency, metric-error-rate, metric-uptime, metric-request-volume',
+            '  Row 2 (colSpan 8+4, rowSpan 2): chart-response-time, chart-error-breakdown',
+            '  Row 3 (colSpan 6+6, rowSpan 2): deployment-log, system-alerts',
+          ].join('\n')
         : role === 'admin'
-          ? 'For this request you MUST call the render_layout tool exactly once. Balance platform visibility: metric-users, activity-feed, chart-pipeline, anomaly-banner.'
-          : 'For this request you MUST call the render_layout tool exactly once. Use a concise overview: metric-mrr, metric-users, chart-revenue.'
-  return `${base}\n\n${roleHint}\nEach card needs moduleId, colSpan (3-12), rowSpan (1-3), order, visible true. Include a short title per card where helpful.`
+          ? [
+              'For this request you MUST call render_layout exactly once.',
+              'Compose an Admin platform layout with these module IDs:',
+              '  Row 1 (colSpan 4 each, rowSpan 1): metric-users, metric-new-signups, metric-active-orgs',
+              '  Row 2 (colSpan 4+8, rowSpan 2): chart-plan-distribution, chart-user-growth',
+              '  Row 3 (colSpan 6+6, rowSpan 2): activity-feed, pipeline-table',
+            ].join('\n')
+          : [
+              'For this request you MUST call render_layout exactly once.',
+              'Compose a Viewer concise layout: metric-mrr (colSpan 6), metric-users (colSpan 6), chart-revenue (colSpan 8 rowSpan 2), chart-pipeline (colSpan 4 rowSpan 2), activity-feed (colSpan 12 rowSpan 2).',
+            ].join('\n')
+  return `${base}\n\n${roleHint}\nEach card must have: moduleId (exact string from vocabulary), colSpan (3-12), rowSpan (1-3), order (0-based), visible true. Include a short descriptive title for each card.`
 }
 
 class NovaToolLoopAgent {

@@ -52,6 +52,14 @@ export async function createAuth() {
     secret: betterAuthSecret,
     trustedOrigins: [appUrl],
     database: databaseAdapter,
+    user: {
+      additionalFields: {
+        role: {
+          type: 'string',
+          defaultValue: 'viewer',
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
     },

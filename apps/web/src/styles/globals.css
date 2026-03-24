@@ -5,9 +5,9 @@
 @import '@novasphere/tokens/themes/arctic-signal';
 @import '@novasphere/tokens/themes/obsidian-gold';
 
-@import '@novasphere/ui-glass/dist/index.css';
-@import '@novasphere/ui-shell/dist/index.css';
-@import '@novasphere/ui-agent/dist/index.css';
+@import '@novasphere/ui-glass/styles.css';
+@import '@novasphere/ui-shell/styles.css';
+@import '@novasphere/ui-agent/styles.css';
 
 @source '../../../../packages/ui-*/src/**/*.{ts,tsx}';
 
@@ -36,7 +36,17 @@ html {
 body {
   background: var(--ns-color-bg);
   color: var(--ns-color-text);
+  font-family: var(--font-space-grotesk), sans-serif;
   transition:
     background-color var(--ns-duration-slow) var(--ns-ease-smooth),
     color var(--ns-duration-slow) var(--ns-ease-smooth);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-exo-2), sans-serif;
 }

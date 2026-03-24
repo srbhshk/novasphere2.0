@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { env } from '@/lib/env'
 import type { HeatmapCell } from '@novasphere/ui-charts'
+import type { KpiMetric } from '@/mocks/mock.types'
 import {
   MOCK_MRR,
   MOCK_CHURN,
   MOCK_ACTIVE_USERS,
-  MOCK_REVENUE_HISTORY,
-  MOCK_PIPELINE_STAGES,
   MOCK_ACTIVITY_HEATMAP,
   MOCK_SPARKLINE_DATA,
+  MOCK_REVENUE_HISTORY,
+  MOCK_PIPELINE_STAGES,
 } from '@/mocks/metrics.mock'
 
 export type MetricsListResult = {
@@ -36,19 +36,45 @@ export type MetricsListResult = {
   sparklineData: Array<{ value: number; label?: string }>
 }
 
-async function fetchMetricsFromApi(): Promise<MetricsListResult> {
-  const res = await fetch('/api/metrics')
-  if (!res.ok) {
-    throw new Error('Failed to fetch metrics')
-  }
-  return res.json() as Promise<MetricsListResult>
+function findKpi(kpis: KpiMetric[], id: string): KpiMetric | undefined {
+  return kpis.find((k) => k.id === id)
 }
 
-function getMockMetrics(): MetricsListResult {
+function kpiToMetric(
+  kpi: KpiMetric | undefined,
+  fallback: MetricsListResult['mrr'],
+): MetricsListResult['mrr'] {
+  if (kpi == null) return fallback
+  const dir =
+    kpi.deltaDirection === 'up' ? 'up' : kpi.deltaDirection === 'down' ? 'down' : 'flat'
   return {
-    mrr: MOCK_MRR,
-    churn: MOCK_CHURN,
-    activeUsers: MOCK_ACTIVE_USERS,
+    value: kpi.value,
+    trend: kpi.trend,
+    deltaDirection: dir,
+    ...(kpi.anomaly === true ? { anomaly: true } : {}),
+  }
+}
+
+async function fetchMetrics(role: string): Promise<MetricsListResult> {
+  const res = await fetch('/api/metrics', {
+    headers: { 'x-user-role': role },
+  })
+  if (!res.ok) throw new Error('Failed to fetch metrics')
+
+  const data = (await res.json()) as { kpis?: KpiMetric[] } & Record<string, unknown>
+  const kpis: KpiMetric[] = Array.isArray(data.kpis) ? data.kpis : []
+
+  const mrr = kpiToMetric(findKpi(kpis, 'mrr'), MOCK_MRR)
+  const churn = kpiToMetric(findKpi(kpis, 'churn'), MOCK_CHURN)
+  const activeUsers = kpiToMetric(
+    findKpi(kpis, 'total-users') ?? findKpi(kpis, 'active-users'),
+    MOCK_ACTIVE_USERS,
+  )
+
+  return {
+    mrr,
+    churn,
+    activeUsers,
     revenueHistory: MOCK_REVENUE_HISTORY,
     pipelineStages: MOCK_PIPELINE_STAGES,
     activityHeatmap: MOCK_ACTIVITY_HEATMAP,
@@ -56,12 +82,12 @@ function getMockMetrics(): MetricsListResult {
   }
 }
 
-export function useMetricsList(): ReturnType<typeof useQuery<MetricsListResult>> {
-  const dataSource = env.NEXT_PUBLIC_DATA_SOURCE
-
+export function useMetricsList(
+  role = 'viewer',
+): ReturnType<typeof useQuery<MetricsListResult>> {
   return useQuery({
-    queryKey: ['metrics', dataSource],
-    queryFn: dataSource === 'api' ? fetchMetricsFromApi : getMockMetrics,
+    queryKey: ['metrics-list', role],
+    queryFn: () => fetchMetrics(role),
     staleTime: 60_000,
   })
 }

@@ -32,7 +32,7 @@ export function GlassCard({
         `ns-glass-card-${variant}`,
         highlight ? 'ns-glass-card-highlight' : undefined,
         hover ? 'ns-glass-card-hover' : undefined,
-        'ns-glass-card-content',
+        'ns-glass-card-content shadow-2xl',
         className,
       )}
       {...rest}

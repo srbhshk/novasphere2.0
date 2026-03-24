@@ -5,6 +5,7 @@ import { THEME_PRESETS, type ThemePreset } from '@novasphere/tokens'
 import { useSession } from '@/lib/auth/auth-client'
 import {
   THEME_COOKIE_NAME,
+  normalizeThemePreset,
   THEME_PRESET_ORDER,
   THEME_STORAGE_KEY,
   isValidThemePreset,
@@ -21,7 +22,7 @@ function applyThemeToDocument(preset: ThemePreset): void {
 
 export default function ThemeSwitcher(): React.JSX.Element {
   const { data: sessionData, isPending } = useSession()
-  const [active, setActive] = React.useState<ThemePreset>('midnight-bloom')
+  const [active, setActive] = React.useState<ThemePreset>('nova-dark')
 
   React.useLayoutEffect(() => {
     const fromStorage = (() => {
@@ -33,7 +34,7 @@ export default function ThemeSwitcher(): React.JSX.Element {
       }
     })()
 
-    const initial = fromStorage ?? 'midnight-bloom'
+    const initial = normalizeThemePreset(fromStorage ?? 'nova-dark')
     applyThemeToDocument(initial)
     setActive(initial)
 
@@ -60,10 +61,11 @@ export default function ThemeSwitcher(): React.JSX.Element {
         }
         const raw = (data as Record<string, unknown>)['themePreset']
         if (isValidThemePreset(raw)) {
-          applyThemeToDocument(raw)
-          setActive(raw)
+          const normalized = normalizeThemePreset(raw)
+          applyThemeToDocument(normalized)
+          setActive(normalized)
           try {
-            window.localStorage.setItem(THEME_STORAGE_KEY, raw)
+            window.localStorage.setItem(THEME_STORAGE_KEY, normalized)
           } catch {
             /* ignore quota */
           }
@@ -76,10 +78,11 @@ export default function ThemeSwitcher(): React.JSX.Element {
 
   const onSelect = React.useCallback(
     (preset: ThemePreset) => {
-      applyThemeToDocument(preset)
-      setActive(preset)
+      const normalized = normalizeThemePreset(preset)
+      applyThemeToDocument(normalized)
+      setActive(normalized)
       try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, preset)
+        window.localStorage.setItem(THEME_STORAGE_KEY, normalized)
       } catch {
         /* ignore */
       }
@@ -89,7 +92,7 @@ export default function ThemeSwitcher(): React.JSX.Element {
           method: 'PATCH',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ themePreset: preset }),
+          body: JSON.stringify({ themePreset: normalized }),
         }).catch(() => {
           /* offline — localStorage + cookie still apply */
         })

@@ -2,14 +2,7 @@ import type { AgentContext } from './context.types'
 import type { ProductConfig } from './product.types'
 import type { UserRole } from './agent.types'
 
-const PROMPT_IDS = {
-  system: 'system',
-  layout: 'layout',
-  anomaly: 'anomaly',
-  intent: 'intent',
-} as const
-
-export type PromptId = (typeof PROMPT_IDS)[keyof typeof PROMPT_IDS]
+export type PromptId = 'system' | 'layout' | 'anomaly' | 'intent'
 
 const INTENTS = {
   layoutChange: 'layout_change',

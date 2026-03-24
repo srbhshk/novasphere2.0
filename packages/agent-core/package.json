@@ -29,6 +29,6 @@
     "msw": "latest",
     "tsup": "latest",
     "typescript": "^5.4.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.1"
   }
 }

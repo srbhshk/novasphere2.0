@@ -74,3 +74,4 @@ tmp/
 # Editor (keep shared VS Code recommendations if added; ignore user-only settings)
 .vscode/settings.json
 .idea/
+apps/web/next-env.d.ts

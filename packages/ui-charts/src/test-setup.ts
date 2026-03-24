@@ -35,5 +35,7 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, no-extra-semi
-;(globalThis as any).ResizeObserver = ResizeObserverMock
+const globalWithResizeObserver = globalThis as typeof globalThis & {
+  ResizeObserver?: typeof ResizeObserverMock
+}
+globalWithResizeObserver.ResizeObserver = ResizeObserverMock

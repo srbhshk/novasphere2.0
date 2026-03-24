@@ -9,6 +9,7 @@ export default [
   {
     name: 'novasphere/web',
     files: ['src/**/*.{ts,tsx}', 'proxy.ts'],
+    ignores: ['next-env.d.ts', '.next/**'],
     rules: {
       'no-console': 'error',
       '@typescript-eslint/no-explicit-any': 'error',

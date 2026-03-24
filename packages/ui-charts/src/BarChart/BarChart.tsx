@@ -22,6 +22,8 @@ const CHART_COLORS = [
   '#facc15',
   '#6366f1',
 ]
+const getChartColor = (index: number): string =>
+  CHART_COLORS[index % CHART_COLORS.length] ?? CHART_COLORS[0] ?? '#38bdf8'
 
 export type BarChartProps = {
   data: BarDataPoint[]
@@ -91,7 +93,7 @@ export function BarChart({
               {data.map((entry, index) => (
                 <Cell
                   key={`bar-${entry.label}-${index}`}
-                  fill={entry.color ?? CHART_COLORS[index % CHART_COLORS.length]}
+                  fill={entry.color ?? getChartColor(index)}
                 />
               ))}
             </Bar>
@@ -129,7 +131,7 @@ export function BarChart({
             {data.map((entry, index) => (
               <Cell
                 key={`bar-${entry.label}-${index}`}
-                fill={entry.color ?? CHART_COLORS[index % CHART_COLORS.length]}
+                fill={entry.color ?? getChartColor(index)}
               />
             ))}
           </Bar>

@@ -33,7 +33,7 @@ export default function AuthShowcase(): React.JSX.Element {
         },
         transition: {
           duration: 7,
-          ease: 'easeInOut',
+          ease: 'easeInOut' as const,
           repeat: Number.POSITIVE_INFINITY,
         },
       }
@@ -41,13 +41,21 @@ export default function AuthShowcase(): React.JSX.Element {
     ? {}
     : {
         animate: { rotateZ: [0, 360] },
-        transition: { duration: 26, ease: 'linear', repeat: Number.POSITIVE_INFINITY },
+        transition: {
+          duration: 26,
+          ease: 'linear' as const,
+          repeat: Number.POSITIVE_INFINITY,
+        },
       }
   const innerRingMotionProps = reduceMotion
     ? {}
     : {
         animate: { rotateZ: [360, 0] },
-        transition: { duration: 18, ease: 'linear', repeat: Number.POSITIVE_INFINITY },
+        transition: {
+          duration: 18,
+          ease: 'linear' as const,
+          repeat: Number.POSITIVE_INFINITY,
+        },
       }
   const tiltMotionProps = reduceMotion
     ? {}
@@ -56,7 +64,7 @@ export default function AuthShowcase(): React.JSX.Element {
         transition: {
           duration: 8.5,
           repeat: Number.POSITIVE_INFINITY,
-          ease: 'easeInOut',
+          ease: 'easeInOut' as const,
         },
       }
 
@@ -90,7 +98,7 @@ export default function AuthShowcase(): React.JSX.Element {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: 'easeOut' }}
+          transition={{ duration: 0.55, ease: 'easeOut' as const }}
           className="relative h-[320px] rounded-2xl border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] p-5 [perspective:1300px]"
         >
           <motion.div
@@ -128,7 +136,7 @@ export default function AuthShowcase(): React.JSX.Element {
                         duration: 4.6,
                         delay: index * 0.18,
                         repeat: Number.POSITIVE_INFINITY,
-                        ease: 'easeInOut',
+                        ease: 'easeInOut' as const,
                       },
                     })}
               />
@@ -152,7 +160,7 @@ export default function AuthShowcase(): React.JSX.Element {
                       duration: 3.3,
                       delay: index * 0.26,
                       repeat: Number.POSITIVE_INFINITY,
-                      ease: 'easeInOut',
+                      ease: 'easeInOut' as const,
                     },
                   })}
             />
@@ -171,7 +179,7 @@ export default function AuthShowcase(): React.JSX.Element {
                       duration: 3.8,
                       delay: index * 1.1,
                       repeat: Number.POSITIVE_INFINITY,
-                      ease: 'easeOut',
+                      ease: 'easeOut' as const,
                     },
                   })}
             />

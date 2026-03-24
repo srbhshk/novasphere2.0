@@ -20,7 +20,7 @@ const legacyBodySchema = z.object({
 })
 
 const useChatBodySchema = z.object({
-  messages: z.array(z.record(z.unknown())),
+  messages: z.array(z.record(z.string(), z.unknown())),
 })
 
 function getRateLimitPerMinute(): number {

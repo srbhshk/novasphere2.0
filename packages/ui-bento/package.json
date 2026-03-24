@@ -27,7 +27,7 @@
   "peerDependencies": {
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19",
-    "framer-motion": "^11",
+    "framer-motion": "^12",
     "lucide-react": "^0.473.0"
   },
   "dependencies": {

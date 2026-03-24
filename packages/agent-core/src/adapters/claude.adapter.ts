@@ -14,7 +14,6 @@ const createId = (): string => `${now()}-${Math.random().toString(16).slice(2)}`
 const isServerSide = (): boolean => !('window' in globalThis)
 
 const requireAnthropic = (): unknown => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('@anthropic-ai/sdk')
 }
 

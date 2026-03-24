@@ -17,6 +17,8 @@ export type DonutChartProps = {
 }
 
 const DEFAULT_COLORS: string[] = ['#38bdf8', '#22c55e', '#a855f7', '#f97316', '#e11d48']
+const getDefaultColor = (index: number): string =>
+  DEFAULT_COLORS[index % DEFAULT_COLORS.length] ?? DEFAULT_COLORS[0] ?? '#38bdf8'
 
 export function DonutChart({
   data,
@@ -59,7 +61,7 @@ export function DonutChart({
               {data.map((entry, index) => (
                 <Cell
                   key={`segment-${entry.id}-${index}`}
-                  fill={entry.color ?? DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                  fill={entry.color ?? getDefaultColor(index)}
                 />
               ))}
             </Pie>
@@ -75,7 +77,7 @@ export function DonutChart({
         </div>
         <div className="flex flex-wrap gap-3">
           {data.map((segment, index) => {
-            const color = segment.color ?? DEFAULT_COLORS[index % DEFAULT_COLORS.length]
+            const color = segment.color ?? getDefaultColor(index)
             const percentage = total === 0 ? 0 : (segment.value / total) * 100
             return (
               <div key={segment.id} className="flex items-center gap-2">

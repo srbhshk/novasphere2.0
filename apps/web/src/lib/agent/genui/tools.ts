@@ -8,7 +8,7 @@ const componentCardSchema = z.object({
   title: z.string().optional(),
   order: z.number().int(),
   visible: z.boolean(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 })
 
 export const renderLayoutSchema = z.preprocess(
@@ -69,7 +69,7 @@ export const renderComponentSchema = z.object({
   colSpan: z.number(),
   rowSpan: z.number(),
   order: z.number(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 })
 
 export const askClarificationSchema = z.preprocess(

@@ -28,8 +28,8 @@
   "peerDependencies": {
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19",
-    "framer-motion": "^11",
-    "zustand": "^4",
+    "framer-motion": "^12",
+    "zustand": "^5",
     "lucide-react": "^0.473.0"
   },
   "dependencies": {

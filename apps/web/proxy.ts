@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 /**
- * Next.js 16 proxy (replaces middleware convention).
+ * Next.js 16 proxy — the successor to the middleware.ts convention.
  * Runs in Node.js runtime — no edge runtime restrictions.
  *
  * Responsibilities:

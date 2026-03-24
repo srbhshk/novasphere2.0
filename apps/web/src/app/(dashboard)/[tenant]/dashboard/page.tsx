@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { CopilotPanel } from '@novasphere/ui-agent'
 import type { CopilotPanelProps } from '@novasphere/ui-agent'
 import { usePathname } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
@@ -23,7 +22,7 @@ import type { SuggestionChip } from '@novasphere/agent-core'
 import type { MetricsListResult } from '@/hooks/useMetricsList'
 
 const CopilotPanelNoSsr = dynamic<CopilotPanelProps>(
-  () => Promise.resolve({ default: CopilotPanel }),
+  () => import('@novasphere/ui-agent').then((m) => ({ default: m.CopilotPanel })),
   { ssr: false },
 )
 

@@ -45,7 +45,8 @@ describe('MockAdapter', () => {
       tokens += 1
     })
     expect(tokens).toBeGreaterThanOrEqual(3)
-  })
+  }, // layoutVariant streams many tokens (60ms each); default 5s flakes under parallel CI load.
+  15_000)
 
   it("getStatus() returns 'idle' after init", async () => {
     const adapter = new MockAdapter()

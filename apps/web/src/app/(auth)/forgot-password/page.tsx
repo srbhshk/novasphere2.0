@@ -1,10 +1,10 @@
 import type React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import SignUpView from './SignUpView'
+import ForgotPasswordView from './ForgotPasswordView'
 import { novaConfig } from 'nova.config'
 
-export default function SignUpPage(): React.JSX.Element {
+export default function ForgotPasswordPage(): React.JSX.Element {
   return (
     <div className="w-full rounded-3xl border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-medium)] p-5 backdrop-blur-xl sm:p-7">
       <div className="mb-6 sm:mb-7">
@@ -22,31 +22,31 @@ export default function SignUpPage(): React.JSX.Element {
           </span>
         </div>
         <h1 className="text-2xl font-semibold text-[color:var(--ns-color-text)] sm:text-3xl">
-          Create your account
+          Reset your password
         </h1>
         <p className="mt-2 text-sm text-[color:var(--ns-color-muted)]">
-          Start using {novaConfig.product.name} in minutes with secure access and guided
-          setup.
+          Enter your account email and we&apos;ll send secure reset instructions for{' '}
+          {novaConfig.product.name}.
         </p>
       </div>
-      <SignUpView />
+      <ForgotPasswordView />
       <div className="mt-5 flex flex-col gap-2.5 text-sm text-[color:var(--ns-color-muted)]">
         <p>
-          Already have an account?{' '}
+          Remembered your password?{' '}
           <Link
             href="/sign-in"
             className="font-medium text-[color:var(--ns-color-accent)] underline decoration-[color:var(--ns-color-border-hi)] underline-offset-4 transition-colors hover:text-[color:var(--ns-color-accent-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ns-color-accent)]"
           >
-            Sign in
+            Back to sign in
           </Link>
         </p>
         <p>
-          Need help with access?{' '}
+          No account yet?{' '}
           <Link
-            href="/forgot-password"
+            href="/sign-up"
             className="font-medium text-[color:var(--ns-color-accent)] underline decoration-[color:var(--ns-color-border-hi)] underline-offset-4 transition-colors hover:text-[color:var(--ns-color-accent-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ns-color-accent)]"
           >
-            Reset password
+            Create one now
           </Link>
         </p>
       </div>

@@ -16,6 +16,7 @@ export default function SignUpView(): React.JSX.Element {
   return (
     <SignupForm
       adapter={betterAuthAdapter}
+      className="p-5 sm:p-6"
       onSuccess={() => {
         router.push('/demo/dashboard')
       }}

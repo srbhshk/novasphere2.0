@@ -1,41 +1,41 @@
 :root[data-theme='obsidian-gold'] {
   /* Core */
-  --ns-color-bg: #1a1e1f;
-  --ns-color-surface: #2d3436;
-  --ns-color-surface-2: #363c3e;
-  --ns-color-accent: #d3b037;
-  --ns-color-accent-2: #dfe6e9;
-  --ns-color-accent-3: #e8c84a;
-  --ns-color-text: #ffffff;
-  --ns-color-muted: #8d9b9e;
-  --ns-color-danger: #e17055;
-  --ns-color-border: rgba(211, 176, 55, 0.12);
-  --ns-color-border-hi: rgba(211, 176, 55, 0.24);
+  --ns-color-bg: #050b16;
+  --ns-color-surface: #0c1528;
+  --ns-color-surface-2: #111e36;
+  --ns-color-accent: #36c2ff;
+  --ns-color-accent-2: #7f8cff;
+  --ns-color-accent-3: #13d9c6;
+  --ns-color-text: #f5f8ff;
+  --ns-color-muted: #8ca0c3;
+  --ns-color-danger: #ff7a90;
+  --ns-color-border: rgba(54, 194, 255, 0.14);
+  --ns-color-border-hi: rgba(54, 194, 255, 0.24);
 
-  --ns-color-accent-10: rgba(211, 176, 55, 0.1);
-  --ns-color-accent-20: rgba(211, 176, 55, 0.2);
-  --ns-color-accent-2-20: rgba(223, 230, 233, 0.15);
-  --ns-color-accent-3-20: rgba(232, 200, 74, 0.2);
-  --ns-color-danger-20: rgba(225, 112, 85, 0.2);
+  --ns-color-accent-10: rgba(54, 194, 255, 0.1);
+  --ns-color-accent-20: rgba(54, 194, 255, 0.2);
+  --ns-color-accent-2-20: rgba(127, 140, 255, 0.2);
+  --ns-color-accent-3-20: rgba(19, 217, 198, 0.2);
+  --ns-color-danger-20: rgba(255, 122, 144, 0.2);
 
-  --ns-glass-bg-subtle: rgba(255, 255, 255, 0.03);
-  --ns-glass-bg-medium: rgba(255, 255, 255, 0.05);
-  --ns-glass-bg-strong: rgba(255, 255, 255, 0.07);
-  --ns-glass-highlight: rgba(211, 176, 55, 0.08);
-  --ns-glass-sheen: linear-gradient(135deg, rgba(211, 176, 55, 0.08) 0%, transparent 50%);
+  --ns-glass-bg-subtle: rgba(245, 248, 255, 0.025);
+  --ns-glass-bg-medium: rgba(245, 248, 255, 0.045);
+  --ns-glass-bg-strong: rgba(245, 248, 255, 0.075);
+  --ns-glass-highlight: rgba(54, 194, 255, 0.1);
+  --ns-glass-sheen: linear-gradient(135deg, rgba(54, 194, 255, 0.1) 0%, transparent 52%);
 
-  --ns-shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
-  --ns-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --ns-shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.45);
-  --ns-shadow-sidebar: 1px 0 0 rgba(211, 176, 55, 0.1);
-  --ns-shadow-topbar: 0 1px 0 rgba(211, 176, 55, 0.1);
-  --ns-shadow-inset: inset 0 1px 0 rgba(211, 176, 55, 0.08);
+  --ns-shadow-card: 0 12px 38px rgba(2, 7, 18, 0.48);
+  --ns-shadow-card-hover: 0 18px 46px rgba(2, 7, 18, 0.58);
+  --ns-shadow-elevated: 0 24px 56px rgba(2, 7, 18, 0.62);
+  --ns-shadow-sidebar: 1px 0 0 rgba(54, 194, 255, 0.12);
+  --ns-shadow-topbar: 0 1px 0 rgba(54, 194, 255, 0.12);
+  --ns-shadow-inset: inset 0 1px 0 rgba(54, 194, 255, 0.1);
 
-  --ns-ambient-bg: #0f1112;
-  --ns-ambient-orb-1: rgba(211, 176, 55, 0.1);
-  --ns-ambient-orb-2: rgba(223, 230, 233, 0.06);
-  --ns-ambient-orb-3: rgba(45, 52, 54, 0.6);
+  --ns-ambient-bg: #030711;
+  --ns-ambient-orb-1: rgba(54, 194, 255, 0.14);
+  --ns-ambient-orb-2: rgba(127, 140, 255, 0.1);
+  --ns-ambient-orb-3: rgba(19, 217, 198, 0.09);
 
-  --ns-glow-accent: rgba(211, 176, 55, 0.35);
-  --ns-glow-accent-2: rgba(223, 230, 233, 0.15);
+  --ns-glow-accent: rgba(54, 194, 255, 0.35);
+  --ns-glow-accent-2: rgba(127, 140, 255, 0.26);
 }

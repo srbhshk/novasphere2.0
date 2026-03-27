@@ -1,30 +1,25 @@
 'use client'
 
 import { useEffect, useMemo, useRef } from 'react'
-import dynamic from 'next/dynamic'
-import type { CopilotPanelProps } from '@novasphere/ui-agent'
-import { usePathname } from 'next/navigation'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
 import { GlassCard, Skeleton } from '@novasphere/ui-glass'
 import { useMetricsList } from '@/hooks/useMetricsList'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
-import { executeToolCall } from '@/lib/agent/genui/tool-executor'
+import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
 import type { GenUiToolName } from '@/lib/agent/genui/tools'
+import { extractToolCalls } from '@/lib/agent/genui/tool-parser'
 import { MODULE_REGISTRY } from './modules/registry'
-import { novaConfig } from 'nova.config'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
+import { classifyUiIntent, requiresToolForIntent } from '@novasphere/agent-core'
+import { DEFAULT_OLLAMA_MODEL } from '@/lib/agent/ollama-defaults'
 import type { MetricsListResult } from '@/hooks/useMetricsList'
+import { useCopilotChat } from '../../CopilotContext'
 
-const CopilotPanelNoSsr = dynamic<CopilotPanelProps>(
-  () => import('@novasphere/ui-agent').then((m) => ({ default: m.CopilotPanel })),
-  { ssr: false },
-)
+const TOOL_RETRY_FEEDBACK_PREFIX = 'Tool call failed:'
 
 // ---------------------------------------------------------------------------
 // Role-based default layouts
@@ -357,50 +352,15 @@ function getFirstAnomalousMetric(
   return null
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function extractToolCallsFromMessage(
-  message: Record<string, unknown>,
-): Array<{ toolCallId: string; toolName: string; args: Record<string, unknown> }> {
-  const parts = message['parts']
-  if (!Array.isArray(parts)) return []
-
-  const results: Array<{
-    toolCallId: string
-    toolName: string
-    args: Record<string, unknown>
-  }> = []
-  for (const part of parts) {
-    if (part && typeof part === 'object') {
-      const p = part as Record<string, unknown>
-      const type = p['type']
-      if (typeof type === 'string' && type.startsWith('tool-')) {
-        const toolName = type.slice(5) as GenUiToolName
-        const argsCandidate = p['args'] ?? p['input'] ?? p['output']
-        const args = isRecord(argsCandidate) ? argsCandidate : {}
-        const state = p['state']
-        const toolCallId =
-          typeof p['toolCallId'] === 'string' ? p['toolCallId'] : `${toolName}-unknown`
-        if (state === 'output-available' || state === 'input-available') {
-          results.push({ toolCallId, toolName, args })
-        }
-      }
-    }
-  }
-  return results
-}
-
 // ---------------------------------------------------------------------------
 // Dashboard page
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage(): React.JSX.Element {
-  const pathname = usePathname() ?? '/'
   const { data: sessionData, isPending } = useSession()
   const authSession = useMemo(() => toAuthSession(sessionData ?? null), [sessionData])
   const agentRole = normalizeAgentRole(authSession?.role)
+  const hasResolvedSession = !isPending && authSession != null
 
   const layout = useLayoutStore((s) => s.layout)
   const setLayout = useLayoutStore((s) => s.setLayout)
@@ -412,10 +372,12 @@ export default function DashboardPage(): React.JSX.Element {
   const setAdapterModel = useAgentPanelStore((s) => s.setAdapterModel)
   const setAdapterStatus = useAgentPanelStore((s) => s.setAdapterStatus)
   const suggestions = useAgentPanelStore((s) => s.suggestions)
-  const isOpen = useAgentPanelStore((s) => s.isOpen)
-  const setOpen = useAgentPanelStore((s) => s.setOpen)
   const processedToolRef = useRef<Set<string>>(new Set())
   const anomalyExplainedRef = useRef<boolean>(false)
+  const initialLayoutRequestedRef = useRef<boolean>(false)
+  const toolRetryCountRef = useRef<number>(0)
+
+  const { messages, sendMessage, status } = useCopilotChat()
 
   // Use legacy hook for anomaly detection only (role-scoped data via useDashboardMetrics in modules)
   const { data: metricsData, isPending: metricsPending } = useMetricsList(agentRole)
@@ -424,33 +386,15 @@ export default function DashboardPage(): React.JSX.Element {
     [metricsData],
   )
 
-  const userId = authSession?.userId ?? 'anonymous'
-  const tenantId = authSession?.tenantId ?? 'demo'
-
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: '/api/agent',
-        headers: {
-          'x-user-id': userId,
-          'x-user-role': agentRole,
-          'x-tenant-id': tenantId,
-          'x-current-route': pathname,
-        },
-      }),
-    [userId, agentRole, tenantId, pathname],
-  )
-
-  const { messages, sendMessage, status } = useChat({ transport })
-
   useEffect(() => {
     setAdapterType('ollama')
-    setAdapterModel('qwen2.5:0.5b')
+    setAdapterModel(DEFAULT_OLLAMA_MODEL)
     setAdapterStatus('idle')
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
 
   // Auto-explain anomaly once on load
   useEffect(() => {
+    if (!hasResolvedSession) return
     if (anomalyExplainedRef.current) return
     if (metricsPending || anomalyMetric == null || isGenerating) return
     if (status === 'streaming' || status === 'submitted') return
@@ -458,70 +402,40 @@ export default function DashboardPage(): React.JSX.Element {
     sendMessage({
       text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}`,
     })
-  }, [metricsPending, anomalyMetric, isGenerating, status, sendMessage])
+  }, [
+    hasResolvedSession,
+    metricsPending,
+    anomalyMetric,
+    isGenerating,
+    status,
+    sendMessage,
+  ])
 
-  // Compose initial layout from the AI on first load.
-  // LLM is the controller — it decides the layout for this role.
-  // Falls back to the static role default only when the model is unavailable.
+  // Compose initial layout from the AI on first load via the chat transport only.
+  // This keeps /api/agent on a single request schema (messages).
   useEffect(() => {
     if (isPending) return
-    const ac = new AbortController()
+    if (!hasResolvedSession) return
+    if (status === 'submitted' || status === 'streaming') return
+    if (initialLayoutRequestedRef.current) return
+    if (messages.length > 0) return
 
-    void (async () => {
-      setGenerating(true)
-      let aiLayoutApplied = false
-      try {
-        const res = await fetch('/api/agent', {
-          method: 'POST',
-          signal: ac.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': userId,
-            'x-user-role': agentRole,
-            'x-tenant-id': tenantId,
-            'x-current-route': pathname,
-          },
-          body: JSON.stringify({
-            prompt: 'Compose the initial dashboard layout for this user',
-            currentRoute: pathname,
-            composeInitialLayout: true,
-          }),
-        })
-        if (res.ok) {
-          const data: unknown = await res.json()
-          if (isRecord(data)) {
-            const cards = data['cards']
-            if (Array.isArray(cards) && cards.length > 0) {
-              executeToolCall('render_layout', { cards }, {
-                layoutStore: {
-                  setLayout: useLayoutStore.getState().setLayout,
-                  getLayout: useLayoutStore.getState().getLayout,
-                },
-                agentStore: {
-                  setSuggestions: useAgentPanelStore.getState().setSuggestions,
-                },
-              } as Parameters<typeof executeToolCall>[2])
-              aiLayoutApplied = true
-            }
-          }
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        if (err instanceof Error && err.name === 'AbortError') return
-      } finally {
-        // Fallback: if the LLM did not produce a layout, use the static role default
-        if (!aiLayoutApplied) {
-          useLayoutStore.getState().setLayout(getDefaultLayoutForRole(agentRole))
-        }
-        setGenerating(false)
-      }
-    })()
+    initialLayoutRequestedRef.current = true
+    setGenerating(true)
+    sendMessage({
+      text: 'Compose the initial dashboard layout for this user.',
+    })
+  }, [hasResolvedSession, isPending, messages.length, sendMessage, setGenerating, status])
 
-    return () => {
-      ac.abort()
+  useEffect(() => {
+    if (status === 'ready') {
       setGenerating(false)
+      const currentLayout = useLayoutStore.getState().getLayout()
+      if (currentLayout == null || currentLayout.length === 0) {
+        useLayoutStore.getState().setLayout(getDefaultLayoutForRole(agentRole))
+      }
     }
-  }, [isPending, agentRole, pathname, userId, tenantId, setGenerating])
+  }, [agentRole, setGenerating, status])
 
   // Mirror streaming status to agent store
   useEffect(() => {
@@ -543,162 +457,177 @@ export default function DashboardPage(): React.JSX.Element {
       const m = msg as unknown as Record<string, unknown>
       const id = m['id'] as string | undefined
       if (!id) continue
-      const toolCalls = extractToolCallsFromMessage(m)
+      const toolCalls = extractToolCalls(m)
       for (const { toolCallId, toolName, args } of toolCalls) {
         const key = `${id}-${toolCallId}-${toolName}`
         if (processedToolRef.current.has(key)) continue
         processedToolRef.current.add(key)
-        executeToolCall(
+
+        const result = executeToolCall(
           toolName as GenUiToolName,
           args,
           stores as Parameters<typeof executeToolCall>[2],
         )
+
+        if (result.status === 'applied') {
+          toolRetryCountRef.current = 0
+          continue
+        }
+
+        if (result.status === 'validation_failed') {
+          if (toolRetryCountRef.current < 1) {
+            toolRetryCountRef.current += 1
+            sendMessage({ text: result.feedback })
+            continue
+          }
+
+          logToolExecutionFailure(toolName, result)
+          continue
+        }
+
+        logToolExecutionFailure(toolName, result)
       }
     }
-  }, [messages, setLayout, getLayout, setSuggestions])
+  }, [messages, setLayout, getLayout, sendMessage, setSuggestions])
 
-  const chatBusy = status === 'streaming' || status === 'submitted'
-  const isLoading = chatBusy || isGenerating
+  useEffect(() => {
+    const lastUser = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          ((message as unknown as Record<string, unknown>)['role'] as
+            | string
+            | undefined) === 'user',
+      )
 
-  // Extract streaming text for the copilot panel
-  const streamingContent = (() => {
-    const last = messages[messages.length - 1]
-    if (!last || typeof last !== 'object') return undefined
-    const m = last as unknown as Record<string, unknown>
-    if (m['role'] !== 'assistant') return undefined
-    const parts = m['parts']
-    if (!Array.isArray(parts)) return undefined
-    const textPart = parts.find(
-      (p) =>
-        p && typeof p === 'object' && (p as Record<string, unknown>)['type'] === 'text',
-    )
-    if (!textPart || typeof textPart !== 'object') return undefined
-    const text = (textPart as Record<string, unknown>)['text']
-    return typeof text === 'string' ? text : undefined
-  })()
+    if (!lastUser) return
 
-  // Normalize AI SDK v6 UIMessage[] → AgentMessage[] for CopilotPanel
-  const normalizedMessages = messages.map((m) => {
-    const msg = m as unknown as Record<string, unknown>
-    const parts = msg['parts'] ?? []
-    const role = msg['role'] ?? 'user'
-    const content = Array.isArray(parts)
+    const lastUserRecord = lastUser as unknown as Record<string, unknown>
+    const parts = lastUserRecord['parts']
+    const text = Array.isArray(parts)
       ? parts
           .filter(
-            (p) =>
-              p &&
-              typeof p === 'object' &&
-              (p as Record<string, unknown>)['type'] === 'text',
+            (part) =>
+              part &&
+              typeof part === 'object' &&
+              (part as Record<string, unknown>)['type'] === 'text',
           )
-          .map((p) => (p as Record<string, unknown>)['text'])
-          .filter((t): t is string => typeof t === 'string')
-          .join('')
+          .map((part) => (part as Record<string, unknown>)['text'])
+          .find((value): value is string => typeof value === 'string')
       : ''
-    const toolCalls = Array.isArray(parts)
-      ? parts
-          .filter((p) => p && typeof p === 'object')
-          .map((p) => {
-            const part = p as Record<string, unknown>
-            const type = part['type']
-            if (typeof type === 'string' && type.startsWith('tool-')) {
-              return {
-                id: (part['toolCallId'] as string) ?? 'tc',
-                toolName: type.slice(5),
-                args: (part['args'] as Record<string, unknown>) ?? {},
-                result: part['output'],
-              }
-            }
-            return null
-          })
-          .filter((tc): tc is NonNullable<typeof tc> => tc != null)
-      : []
-    return {
-      id: (msg['id'] as string) ?? '',
-      role: role as 'user' | 'assistant' | 'system',
-      content,
-      timestamp: Date.now(),
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+
+    if (typeof text === 'string' && !text.startsWith(TOOL_RETRY_FEEDBACK_PREFIX)) {
+      toolRetryCountRef.current = 0
     }
-  })
+  }, [messages])
+
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (messages.length < 2) return
+
+    const lastAssistant = messages[messages.length - 1]
+    const lastUser = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          ((message as unknown as Record<string, unknown>)['role'] as
+            | string
+            | undefined) === 'user',
+      )
+    if (!lastAssistant || !lastUser) return
+
+    const assistantRecord = lastAssistant as unknown as Record<string, unknown>
+    const userRecord = lastUser as unknown as Record<string, unknown>
+    const assistantToolCalls = extractToolCalls(assistantRecord)
+    if (assistantToolCalls.length > 0) return
+
+    const userParts = userRecord['parts']
+    const userText = Array.isArray(userParts)
+      ? userParts
+          .filter(
+            (part) =>
+              part &&
+              typeof part === 'object' &&
+              (part as Record<string, unknown>)['type'] === 'text',
+          )
+          .map((part) => (part as Record<string, unknown>)['text'])
+          .find((value): value is string => typeof value === 'string')
+      : ''
+
+    const intent = classifyUiIntent(userText ?? '')
+    if (!requiresToolForIntent(intent)) return
+    if (suggestions.length > 0) return
+
+    const fallbackSuggestions: SuggestionChip[] = [
+      {
+        id: 'clarify-focus',
+        label: 'Focus on top risks first',
+        action: 'Focus on top risk signals while keeping the current layout.',
+      },
+      {
+        id: 'clarify-balance',
+        label: 'Balance risks and growth',
+        action: 'Balance risk and growth signals in the current layout.',
+      },
+      {
+        id: 'clarify-visual',
+        label: 'Prefer minimal visual changes',
+        action: 'Keep layout changes minimal and explain what changed.',
+      },
+    ]
+    setSuggestions(fallbackSuggestions)
+  }, [messages, setSuggestions, status, suggestions.length])
+
+  const chatBusy = status === 'streaming' || status === 'submitted'
+  void chatBusy
 
   return (
-    <div className="flex h-full w-full gap-4">
-      <div className="min-w-0 flex-1 transition-opacity duration-300">
-        {layout == null && isGenerating ? (
-          // Skeleton state: LLM is composing the initial layout
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-              gridAutoRows: 'minmax(120px, auto)',
-              gap: '16px',
-              width: '100%',
-            }}
-          >
-            {(
-              [
-                { cols: 4, rows: 1 },
-                { cols: 4, rows: 1 },
-                { cols: 4, rows: 1 },
-                { cols: 8, rows: 2 },
-                { cols: 4, rows: 2 },
-                { cols: 6, rows: 2 },
-                { cols: 6, rows: 2 },
-              ] as Array<{ cols: number; rows: number }>
-            ).map((cell, i) => (
-              <GlassCard
-                key={i}
-                variant="subtle"
-                className="flex h-full flex-col gap-3 p-4"
-                style={{
-                  gridColumn: `span ${cell.cols} / span ${cell.cols}`,
-                  gridRow: `span ${cell.rows} / span ${cell.rows}`,
-                }}
-              >
-                <Skeleton rounded="md" className="h-4 w-1/3" />
-                <Skeleton rounded="md" className="h-8 w-2/3" />
-                {cell.rows > 1 && <Skeleton rounded="md" className="flex-1" />}
-              </GlassCard>
-            ))}
-          </div>
-        ) : (
-          <BentoGrid
-            layout={layout ?? getDefaultLayoutForRole(agentRole)}
-            modules={MODULE_REGISTRY}
-            onReorder={(next) => setLayout(next)}
-            className="h-full w-full"
-          />
-        )}
-      </div>
-      <div
-        className={`shrink-0 transition-all duration-300 ${isOpen ? 'w-[380px]' : 'w-auto'}`}
-      >
-        <CopilotPanelNoSsr
-          messages={normalizedMessages}
-          isLoading={isLoading}
-          {...(streamingContent != null ? { streamingContent } : {})}
-          suggestions={suggestions}
-          adapterType="ollama"
-          adapterModel="qwen2.5:0.5b"
-          adapterStatus={
-            status === 'streaming'
-              ? 'streaming'
-              : status === 'submitted' || isGenerating
-                ? 'thinking'
-                : 'idle'
-          }
-          onSend={(text: string) => {
-            sendMessage({ text })
+    <div className="min-h-0 w-full">
+      {layout == null && isGenerating ? (
+        // Skeleton state: LLM is composing the initial layout
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+            gridAutoRows: 'minmax(120px, auto)',
+            gap: '16px',
+            width: '100%',
           }}
-          onSuggestionSelect={(chip: SuggestionChip) => {
-            sendMessage({ text: chip.action })
-            setSuggestions([])
-          }}
-          isOpen={isOpen}
-          onOpenChange={setOpen}
-          agentName={novaConfig.agent.name}
+        >
+          {(
+            [
+              { cols: 4, rows: 1 },
+              { cols: 4, rows: 1 },
+              { cols: 4, rows: 1 },
+              { cols: 8, rows: 2 },
+              { cols: 4, rows: 2 },
+              { cols: 6, rows: 2 },
+              { cols: 6, rows: 2 },
+            ] as Array<{ cols: number; rows: number }>
+          ).map((cell, i) => (
+            <GlassCard
+              key={i}
+              variant="subtle"
+              className="flex h-full flex-col gap-3 p-4"
+              style={{
+                gridColumn: `span ${cell.cols} / span ${cell.cols}`,
+                gridRow: `span ${cell.rows} / span ${cell.rows}`,
+              }}
+            >
+              <Skeleton rounded="md" className="h-4 w-1/3" />
+              <Skeleton rounded="md" className="h-8 w-2/3" />
+              {cell.rows > 1 && <Skeleton rounded="md" className="flex-1" />}
+            </GlassCard>
+          ))}
+        </div>
+      ) : (
+        <BentoGrid
+          layout={layout ?? getDefaultLayoutForRole(agentRole)}
+          modules={MODULE_REGISTRY}
+          onReorder={(next) => setLayout(next)}
+          className="h-full w-full"
         />
-      </div>
+      )}
     </div>
   )
 }

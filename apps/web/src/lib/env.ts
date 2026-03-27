@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { DEFAULT_OLLAMA_MODEL } from './agent/ollama-defaults'
+
 const serverSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32).optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
@@ -8,7 +10,7 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
-  OLLAMA_MODEL: z.string().min(1).default('qwen2.5:0.5b'),
+  OLLAMA_MODEL: z.string().min(1).default(DEFAULT_OLLAMA_MODEL),
   DATABASE_URL: z.string().min(1).default('file:./dev.db'),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

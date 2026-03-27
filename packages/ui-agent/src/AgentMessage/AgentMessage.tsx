@@ -18,11 +18,32 @@ function formatTime(timestamp: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
-function toolChipLabel(toolName: string): string {
+function toolChipLabel(toolName: string, args?: Record<string, unknown>): string {
   if (toolName === 'render_layout') {
-    return '✓ Layout updated'
+    const reasoning = args?.['reasoning']
+    if (
+      typeof reasoning === 'string' &&
+      reasoning.trim().length > 0 &&
+      reasoning.length <= 80
+    ) {
+      return `✓ ${reasoning}`
+    }
+    return '✓ Dashboard updated'
   }
-  return toolName
+  if (toolName === 'filter_by_relevance') {
+    const narrative = args?.['narrative']
+    if (
+      typeof narrative === 'string' &&
+      narrative.trim().length > 0 &&
+      narrative.length <= 80
+    ) {
+      return `✓ ${narrative}`
+    }
+    return '✓ Layout filtered'
+  }
+  if (toolName === 'explain_anomaly') return '✓ Anomaly analyzed'
+  if (toolName === 'render_component') return '✓ Component updated'
+  return `✓ ${toolName}`
 }
 
 export function AgentMessage({
@@ -56,7 +77,7 @@ export function AgentMessage({
           <div className="mb-2 flex flex-wrap gap-1">
             {toolCalls.map((tc) => (
               <span key={tc.id} className="ns-agent-message-toolChip">
-                {toolChipLabel(tc.toolName)}
+                {toolChipLabel(tc.toolName, tc.args)}
               </span>
             ))}
           </div>

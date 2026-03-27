@@ -169,8 +169,9 @@ const PIPELINE_COLUMNS: ColumnDef<PipelineDeal>[] = [
 export function CustomerTableModule({ config }: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useCustomerList({ role, limit: 10, sort: 'mrr' })
+  const wrapperTitle = config.title ? undefined : 'Top Customers'
   return (
-    <ModuleWrapper title={config.title ?? 'Top Customers'}>
+    <ModuleWrapper title={wrapperTitle}>
       <DataTable<CustomerRow>
         columns={CUSTOMER_COLUMNS}
         data={data?.items ?? []}
@@ -186,8 +187,9 @@ export function PipelineTableModule({ config }: BentoCardModuleProps): React.JSX
   const { role } = useCurrentRole()
   const { data, isLoading } = usePipelineDeals({ role, stage: 'all' })
   const deals = data?.items.slice(0, 12) ?? []
+  const wrapperTitle = config.title ? undefined : 'Active Pipeline'
   return (
-    <ModuleWrapper title={config.title ?? 'Active Pipeline'}>
+    <ModuleWrapper title={wrapperTitle}>
       <DataTable<PipelineDeal>
         columns={PIPELINE_COLUMNS}
         data={deals}

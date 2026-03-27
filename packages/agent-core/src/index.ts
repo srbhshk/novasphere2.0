@@ -1,4 +1,12 @@
-export { ADAPTER_TYPE, AGENT_STATUS, TENANT_PLAN, USER_ROLE } from './agent.types'
+export {
+  ADAPTER_TYPE,
+  AGENT_STATUS,
+  TENANT_PLAN,
+  UI_CONTRACT_FALLBACK,
+  UI_CONTRACT_STATUS,
+  UI_INTENT,
+  USER_ROLE,
+} from './agent.types'
 export type {
   ActivityEvent,
   ActivitySeverity,
@@ -13,6 +21,11 @@ export type {
   MetricSnapshot,
   SuggestionChip,
   TenantPlan,
+  UiActionContractDecision,
+  UiActionContractResult,
+  UiContractFallback,
+  UiContractStatus,
+  UiIntent,
   UserPreferences,
   UserRole,
 } from './agent.types'
@@ -34,9 +47,12 @@ export type { AgentAdapter } from './adapter.interface'
 export { createAdapter, isServerSide } from './adapter.factory'
 
 export {
+  allowedFallbackForIntent,
+  classifyUiIntent,
   getAnomalyPrompt,
   getIntentPrompt,
   getLayoutPrompt,
+  requiresToolForIntent,
   getSystemPrompt,
   PROMPTS,
 } from './prompts'

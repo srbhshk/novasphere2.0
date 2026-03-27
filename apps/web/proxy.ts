@@ -16,7 +16,7 @@ import type { NextRequest } from 'next/server'
  * the user's role via user.additionalFields (see auth.ts + seed.ts).
  */
 
-const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/api/auth']
+const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/forgot-password', '/api/auth']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))

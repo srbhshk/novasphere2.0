@@ -131,10 +131,24 @@ export function CopilotPanel({
       <button
         type="button"
         onClick={() => onOpenChange(true)}
-        className={cn('rounded-lg border border-[var(--ns-color-border)] p-2', className)}
+        className={cn(
+          [
+            'group relative rounded-2xl border border-[var(--ns-color-border)] p-3',
+            'bg-[radial-gradient(80%_80%_at_30%_20%,var(--ns-color-accent-10),transparent_60%),linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
+            'shadow-[0_18px_50px_rgba(0,0,0,0.45)]',
+            'transition-all duration-200',
+            'hover:-translate-y-0.5 hover:shadow-[0_22px_70px_rgba(0,0,0,0.55)]',
+            'active:translate-y-0 active:shadow-[0_12px_40px_rgba(0,0,0,0.45)]',
+            'focus-visible:ring-2 focus-visible:ring-[var(--ns-color-accent)]/50 focus-visible:outline-none',
+          ].join(' '),
+          className,
+        )}
         aria-label="Open copilot"
       >
-        <Bot className="h-5 w-5 text-[var(--ns-color-muted)]" />
+        <div className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(70%_70%_at_50%_0%,rgba(255,255,255,0.12),transparent_60%)]" />
+        </div>
+        <Bot className="relative h-5 w-5 text-[var(--ns-color-text)]" />
       </button>
     )
   }

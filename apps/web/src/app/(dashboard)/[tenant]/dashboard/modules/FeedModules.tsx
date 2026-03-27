@@ -61,8 +61,9 @@ export function ActivityFeedModule({ config }: BentoCardModuleProps): React.JSX.
   const { role } = useCurrentRole()
   const { data, isLoading } = useActivityFeed({ role, limit: 20 })
   const events = data?.items ?? []
+  const wrapperTitle = config.title ? undefined : 'Activity Feed'
   return (
-    <ModuleWrapper title={config.title ?? 'Activity Feed'}>
+    <ModuleWrapper title={wrapperTitle}>
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-2">
           {isLoading
@@ -131,8 +132,9 @@ export function DeploymentLogModule({ config }: BentoCardModuleProps): React.JSX
   const { role } = useCurrentRole()
   const { data, isLoading } = useDeployments({ role })
   const deployments = data?.items ?? []
+  const wrapperTitle = config.title ? undefined : 'Recent Deployments'
   return (
-    <ModuleWrapper title={config.title ?? 'Recent Deployments'}>
+    <ModuleWrapper title={wrapperTitle}>
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-2">
           {isLoading
@@ -211,8 +213,9 @@ export function SystemAlertsModule({ config }: BentoCardModuleProps): React.JSX.
   const { role } = useCurrentRole()
   const { data, isLoading } = useSystemHealth(role)
   const alerts = data?.alerts ?? []
+  const wrapperTitle = config.title ? undefined : 'System Alerts'
   return (
-    <ModuleWrapper title={config.title ?? 'System Alerts'}>
+    <ModuleWrapper title={wrapperTitle}>
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-2">
           {isLoading

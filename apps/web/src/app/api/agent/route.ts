@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { convertToModelMessages } from 'ai'
 import { z } from 'zod'
+import { headers } from 'next/headers'
 import { buildAgentContext } from '@/lib/agent/context-builder'
-import { novaAgent } from '@/lib/agent/nova-agent'
-import { genUiTools } from '@/lib/agent/genui/tools'
+import { detectLayoutIntent, novaAgent } from '@/lib/agent/nova-agent'
+import { genUiTools, renderLayoutSchema } from '@/lib/agent/genui/tools'
+import { writeAgentLog } from '@/lib/agent/observability'
+import { createAuth } from '@/lib/auth/auth'
 
 type RateWindow = {
   count: number
@@ -12,16 +15,11 @@ type RateWindow = {
 
 const RATE_WINDOWS = new Map<string, RateWindow>()
 
-const legacyBodySchema = z.object({
-  prompt: z.string().min(1),
-  conversationHistory: z.string().default(''),
-  currentRoute: z.string().default('/'),
-  composeInitialLayout: z.boolean().optional(),
-})
-
 const useChatBodySchema = z.object({
   messages: z.array(z.record(z.string(), z.unknown())),
 })
+
+const WARN_MODE_DAYS = 21
 
 function getRateLimitPerMinute(): number {
   const raw = process.env['RATE_LIMIT_AGENT_RPM']
@@ -74,30 +72,279 @@ function getLastUserMessage(messages: Array<Record<string, unknown>>): string {
   return ''
 }
 
-function normalizeUserPrompt(input: string): string {
-  const normalized = input.trim()
-  if (normalized.toLowerCase() === 'show me what matters for the board meeting') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-mrr","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"MRR"},{"moduleId":"metric-churn","colSpan":4,"rowSpan":1,"order":1,"visible":true,"title":"Churn"},{"moduleId":"metric-users","colSpan":4,"rowSpan":1,"order":2,"visible":true,"title":"Active Users"},{"moduleId":"chart-revenue","colSpan":8,"rowSpan":2,"order":3,"visible":true,"title":"Revenue"},{"moduleId":"chart-pipeline","colSpan":4,"rowSpan":2,"order":4,"visible":true,"title":"Pipeline"}],"reasoning":"Board-level metrics first, then revenue and pipeline."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function normalizeUserRole(
+  value: unknown,
+): 'admin' | 'ceo' | 'engineer' | 'viewer' | null {
+  if (
+    value === 'admin' ||
+    value === 'ceo' ||
+    value === 'engineer' ||
+    value === 'viewer'
+  ) {
+    return value
   }
-  if (normalized.toLowerCase() === 'make this better') {
-    return `${normalized}\n\nYou MUST call ask_clarification with this JSON arguments:\n{"question":"What are you optimising for right now?","options":["Board presentation","Daily standup","Investor review"]}\nAfter the tool call, respond with only the clarifying question text.`
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (
+      normalized === 'admin' ||
+      normalized === 'ceo' ||
+      normalized === 'engineer' ||
+      normalized === 'viewer'
+    ) {
+      return normalized
+    }
   }
-  if (normalized.toLowerCase() === 'board presentation') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-mrr","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"MRR"},{"moduleId":"metric-churn","colSpan":4,"rowSpan":1,"order":1,"visible":true,"title":"Churn"},{"moduleId":"metric-users","colSpan":4,"rowSpan":1,"order":2,"visible":true,"title":"Active Users"},{"moduleId":"chart-revenue","colSpan":8,"rowSpan":2,"order":3,"visible":true,"title":"Revenue"},{"moduleId":"chart-pipeline","colSpan":4,"rowSpan":2,"order":4,"visible":true,"title":"Pipeline"}],"reasoning":"Board presentation: top-line metrics first, then revenue and pipeline."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+  return null
+}
+
+async function resolveRoleFromSessionOrHeader(
+  request: Request,
+): Promise<'admin' | 'ceo' | 'engineer' | 'viewer'> {
+  const headerRole = normalizeUserRole(request.headers.get('x-user-role'))
+
+  try {
+    const auth = await createAuth()
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (session == null || !isRecord(session)) {
+      return headerRole ?? 'viewer'
+    }
+
+    const user = session['user']
+    if (!isRecord(user)) {
+      return headerRole ?? 'viewer'
+    }
+
+    const sessionRole = normalizeUserRole(user['role'])
+    return sessionRole ?? headerRole ?? 'viewer'
+  } catch {
+    return headerRole ?? 'viewer'
   }
-  if (normalized.toLowerCase() === 'daily standup') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-users","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"Active Users"},{"moduleId":"chart-activity","colSpan":8,"rowSpan":2,"order":1,"visible":true,"title":"Activity"},{"moduleId":"activity-feed","colSpan":4,"rowSpan":2,"order":2,"visible":true,"title":"Recent Activity"}],"reasoning":"Daily standup: focus on operational activity and recent changes."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+}
+
+export function getWarnModeStatus(now: number = Date.now()): {
+  warnMode: boolean
+  dayIndex: number
+} {
+  const sinceMs = now - Date.UTC(2026, 2, 24, 0, 0, 0, 0)
+  const dayIndex = Math.floor(sinceMs / 86_400_000) + 1
+  return { warnMode: dayIndex <= WARN_MODE_DAYS, dayIndex }
+}
+
+function inspectToolMarker(chunk: string): boolean {
+  type JsonValue =
+    | null
+    | boolean
+    | number
+    | string
+    | JsonValue[]
+    | { [key: string]: JsonValue }
+
+  function isToolType(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    if (value === 'tool-input-start') return true
+    if (value === 'tool-output') return true
+    return value.startsWith('tool-')
   }
-  if (normalized.toLowerCase() === 'investor review') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-mrr","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"MRR"},{"moduleId":"metric-arr","colSpan":4,"rowSpan":1,"order":1,"visible":true,"title":"ARR"},{"moduleId":"metric-nrr","colSpan":4,"rowSpan":1,"order":2,"visible":true,"title":"Net Revenue Retention"},{"moduleId":"metric-churn","colSpan":6,"rowSpan":1,"order":3,"visible":true,"title":"Churn Rate"},{"moduleId":"metric-conversion","colSpan":6,"rowSpan":1,"order":4,"visible":true,"title":"Conversion"},{"moduleId":"chart-revenue-comparison","colSpan":8,"rowSpan":2,"order":5,"visible":true,"title":"Revenue vs Prior Year"},{"moduleId":"chart-pipeline","colSpan":4,"rowSpan":2,"order":6,"visible":true,"title":"Pipeline"},{"moduleId":"customer-table","colSpan":12,"rowSpan":2,"order":7,"visible":true,"title":"Top Accounts"}],"reasoning":"Investor review: YoY growth, churn, NRR, pipeline and top accounts."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+
+  function containsToolEvent(value: unknown): boolean {
+    if (value == null) return false
+    if (Array.isArray(value)) return value.some(containsToolEvent)
+    if (typeof value !== 'object') return false
+
+    const record = value as Record<string, unknown>
+    if (isToolType(record['type'])) return true
+
+    for (const key of Object.keys(record)) {
+      if (containsToolEvent(record[key])) return true
+    }
+    return false
   }
-  if (normalized.toLowerCase() === 'show me customer health') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-churn","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"Churn Rate"},{"moduleId":"metric-nrr","colSpan":4,"rowSpan":1,"order":1,"visible":true,"title":"NRR"},{"moduleId":"metric-arpu","colSpan":4,"rowSpan":1,"order":2,"visible":true,"title":"ARPU"},{"moduleId":"chart-churn-trend","colSpan":6,"rowSpan":2,"order":3,"visible":true,"title":"Churn Trend"},{"moduleId":"chart-top-customers","colSpan":6,"rowSpan":2,"order":4,"visible":true,"title":"Top Customers"},{"moduleId":"customer-table","colSpan":12,"rowSpan":2,"order":5,"visible":true,"title":"Customer Health"}],"reasoning":"Customer health view: churn, NRR, ARPU, trend and top customer details."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+
+  function tryParseJson(text: string): JsonValue | null {
+    try {
+      return JSON.parse(text) as JsonValue
+    } catch {
+      return null
+    }
   }
-  if (normalized.toLowerCase() === 'how are deployments going') {
-    return `${normalized}\n\nYou MUST call render_layout exactly once with this JSON arguments:\n{"cards":[{"moduleId":"metric-uptime","colSpan":4,"rowSpan":1,"order":0,"visible":true,"title":"Uptime"},{"moduleId":"metric-error-rate","colSpan":4,"rowSpan":1,"order":1,"visible":true,"title":"Error Rate"},{"moduleId":"metric-api-latency","colSpan":4,"rowSpan":1,"order":2,"visible":true,"title":"API Latency"},{"moduleId":"chart-response-time","colSpan":8,"rowSpan":2,"order":3,"visible":true,"title":"Response Time (24h)"},{"moduleId":"deployment-log","colSpan":4,"rowSpan":2,"order":4,"visible":true,"title":"Deployments"},{"moduleId":"system-alerts","colSpan":12,"rowSpan":2,"order":5,"visible":true,"title":"Active Alerts"}],"reasoning":"Deployment health view: reliability metrics, latency, recent deployments and alerts."}\nAfter the tool call, provide a brief explanation (1 sentence).`
+
+  const lines = chunk.split('\n')
+  let sawParsableJson = false
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (line.length === 0) continue
+
+    // SSE format: "data: {...}" or "data: [...]"
+    if (line.startsWith('data:')) {
+      const payload = line.slice('data:'.length).trim()
+      if (payload.length === 0 || payload === '[DONE]') continue
+      const parsed = tryParseJson(payload)
+      if (parsed == null) continue
+      sawParsableJson = true
+      if (containsToolEvent(parsed)) return true
+      continue
+    }
+
+    // NDJSON / JSONL format: "{...}" or "[...]"
+    if (line.startsWith('{') || line.startsWith('[')) {
+      const parsed = tryParseJson(line)
+      if (parsed == null) continue
+      sawParsableJson = true
+      if (containsToolEvent(parsed)) return true
+    }
   }
-  return normalized
+
+  // If this chunk contains parsable JSON and none had tool events, return false.
+  // If this chunk is partial/unparseable, we intentionally return false to avoid false positives.
+  return sawParsableJson ? false : false
+}
+
+async function bufferResponse(
+  response: Response,
+): Promise<{ text: string; toolDetected: boolean }> {
+  if (response.body == null) {
+    return { text: '', toolDetected: false }
+  }
+  const text = await response.text()
+  return { text, toolDetected: inspectToolMarker(text) }
+}
+
+function detectFakeRenderLayoutJson(text: string): boolean {
+  const max = 200_000
+  const trimmed = text.trim()
+  const input = trimmed.length > max ? trimmed.slice(0, max) : trimmed
+
+  function tryParse(candidate: string): unknown | null {
+    try {
+      return JSON.parse(candidate) as unknown
+    } catch {
+      return null
+    }
+  }
+
+  function looksLikeRenderLayout(value: unknown): boolean {
+    const parsed = renderLayoutSchema.safeParse(value)
+    return parsed.success
+  }
+
+  // Prefer fenced JSON blocks: ```json ... ```
+  const fenceRegex = /```json\s*([\s\S]*?)\s*```/g
+  for (const match of input.matchAll(fenceRegex)) {
+    const candidate = match[1]
+    if (typeof candidate !== 'string' || candidate.trim().length === 0) continue
+    const parsed = tryParse(candidate.trim())
+    if (parsed != null && looksLikeRenderLayout(parsed)) return true
+  }
+
+  // Whole-body JSON
+  if (input.startsWith('{') || input.startsWith('[')) {
+    const parsed = tryParse(input)
+    if (parsed != null && looksLikeRenderLayout(parsed)) return true
+  }
+
+  // Best-effort extraction of a JSON object substring.
+  const firstBrace = input.indexOf('{')
+  const lastBrace = input.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const candidate = input.slice(firstBrace, lastBrace + 1)
+    const parsed = tryParse(candidate)
+    if (parsed != null && looksLikeRenderLayout(parsed)) return true
+  }
+
+  return false
+}
+
+function cloneResponseFromText(source: Response, text: string): Response {
+  return new Response(text, {
+    status: source.status,
+    statusText: source.statusText,
+    headers: source.headers,
+  })
+}
+
+function wrapResponseWithContractLogging(
+  response: Response,
+  contract: {
+    requiresTool: boolean
+    intent: string
+    role: string
+    tenantId: string
+    productDomain: string
+    warnMode: boolean
+    dayIndex: number
+  },
+): Response {
+  if (response.body == null || !contract.requiresTool) {
+    return response
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  let toolDetected = false
+  let carry = ''
+
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read()
+      if (done) {
+        if (!toolDetected && carry.length > 0 && inspectToolMarker(carry)) {
+          toolDetected = true
+        }
+        const base = {
+          intent: contract.intent,
+          requiresTool: contract.requiresTool,
+          toolDetected,
+          role: contract.role,
+          tenantId: contract.tenantId,
+          productDomain: contract.productDomain,
+          mode: contract.warnMode ? 'warn' : 'enforce',
+          dayIndex: contract.dayIndex,
+        }
+        if (!toolDetected) {
+          writeAgentLog({
+            event: 'contract_violation',
+            ...base,
+          })
+        } else {
+          writeAgentLog({
+            event: 'contract_compliant',
+            ...base,
+          })
+        }
+        controller.close()
+        return
+      }
+      if (value) {
+        const text = decoder.decode(value, { stream: true })
+
+        // Preserve only a small tail to handle split lines across chunks.
+        const combined = carry + text
+        const lastNewline = combined.lastIndexOf('\n')
+        if (lastNewline >= 0) {
+          carry = combined.slice(lastNewline + 1)
+        } else {
+          carry = combined.length > 8192 ? combined.slice(-8192) : combined
+        }
+
+        if (inspectToolMarker(combined)) {
+          toolDetected = true
+        }
+        controller.enqueue(encoder.encode(text))
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -109,55 +356,55 @@ export async function POST(request: Request): Promise<Response> {
   const rawBody = (await request.json()) as Record<string, unknown>
 
   const useChatParsed = useChatBodySchema.safeParse(rawBody)
-  const legacyParsed = legacyBodySchema.safeParse(rawBody)
-
   let userMessage: string
   let currentRoute: string
   let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>> | undefined
-  let composeInitialLayout = false
 
-  if (useChatParsed.success && useChatParsed.data.messages.length > 0) {
-    userMessage = normalizeUserPrompt(
-      getLastUserMessage(useChatParsed.data.messages as Array<Record<string, unknown>>),
-    )
-    currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
-    try {
-      modelMessages = await convertToModelMessages(
-        useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
-        {
-          tools: genUiTools,
-          ignoreIncompleteToolCalls: true,
-        },
-      )
-    } catch {
-      // Fallback for providers that reject some message-part shapes (e.g. item_reference).
-      modelMessages = undefined
-    }
-  } else if (legacyParsed.success) {
-    userMessage = normalizeUserPrompt(legacyParsed.data.prompt)
-    currentRoute = legacyParsed.data.currentRoute
-    composeInitialLayout = legacyParsed.data.composeInitialLayout === true
-  } else {
+  if (!useChatParsed.success || useChatParsed.data.messages.length === 0) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  userMessage = getLastUserMessage(
+    useChatParsed.data.messages as Array<Record<string, unknown>>,
+  )
+  currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
+  try {
+    modelMessages = await convertToModelMessages(
+      useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
+      {
+        tools: genUiTools,
+        ignoreIncompleteToolCalls: true,
+      },
+    )
+  } catch {
+    // Fallback for providers that reject some message-part shapes (e.g. item_reference).
+    modelMessages = undefined
+  }
+
+  const canonicalRole = await resolveRoleFromSessionOrHeader(request)
+  const contextHeaders = new Headers(request.headers)
+  contextHeaders.set('x-user-role', canonicalRole)
+
   const context = await buildAgentContext({
-    headers: request.headers,
+    headers: contextHeaders,
     userMessage,
     conversationHistory: '',
     currentRoute,
   })
 
-  if (composeInitialLayout && (modelMessages == null || modelMessages.length === 0)) {
-    const composed = await novaAgent.composeInitialLayout(context)
-    const cards = composed?.cards ?? []
-    return NextResponse.json({ cards })
-  }
-
+  const isLayoutIntent = detectLayoutIntent(userMessage)
   const runResult =
     modelMessages != null && modelMessages.length > 0
-      ? await novaAgent.stream({ messages: modelMessages, options: context })
-      : await novaAgent.stream({ prompt: userMessage, options: context })
+      ? await novaAgent.stream({
+          messages: modelMessages,
+          options: context,
+          forceRenderLayout: isLayoutIntent,
+        })
+      : await novaAgent.stream({
+          prompt: userMessage,
+          options: context,
+          forceRenderLayout: isLayoutIntent,
+        })
 
   if (runResult == null || typeof runResult !== 'object') {
     return NextResponse.json({ error: 'Agent stream unavailable' }, { status: 500 })
@@ -167,7 +414,94 @@ export async function POST(request: Request): Promise<Response> {
     runResult as { toUIMessageStreamResponse?: () => Response }
   ).toUIMessageStreamResponse
   if (typeof toUIMessageStreamResponse === 'function') {
-    return toUIMessageStreamResponse.call(runResult)
+    const streamResponse = toUIMessageStreamResponse.call(runResult)
+    const { warnMode, dayIndex } = getWarnModeStatus()
+    const wrapped = wrapResponseWithContractLogging(streamResponse, {
+      requiresTool: context.uiContract?.requiresTool === true,
+      intent: context.uiContract?.intent ?? 'informational_qna',
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+      warnMode,
+      dayIndex,
+    })
+
+    const shouldEnforceToolRetry =
+      isLayoutIntent || context.uiContract?.requiresTool === true
+    if (!shouldEnforceToolRetry) {
+      return wrapped
+    }
+
+    const buffered = await bufferResponse(wrapped)
+    if (buffered.toolDetected) {
+      return cloneResponseFromText(wrapped, buffered.text)
+    }
+
+    const fakeJsonDetected = detectFakeRenderLayoutJson(buffered.text)
+    if (fakeJsonDetected) {
+      writeAgentLog({
+        event: 'fake_json_render_layout_text_detected',
+        role: context.userRole,
+        tenantId: context.tenantId,
+        productDomain: context.productDomain,
+      })
+    }
+
+    writeAgentLog({
+      event: 'layout_intent_missing_tool_retry',
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+    })
+
+    const retryRunResult =
+      modelMessages != null && modelMessages.length > 0
+        ? await novaAgent.stream({
+            messages: modelMessages,
+            options: context,
+            forceRenderLayout: true,
+            forceRenderLayoutRetry: true,
+          })
+        : await novaAgent.stream({
+            prompt: userMessage,
+            options: context,
+            forceRenderLayout: true,
+            forceRenderLayoutRetry: true,
+          })
+
+    const retryToUIMessageStreamResponse = (
+      retryRunResult as { toUIMessageStreamResponse?: () => Response }
+    ).toUIMessageStreamResponse
+    if (typeof retryToUIMessageStreamResponse !== 'function') {
+      return NextResponse.json(
+        { error: 'Agent stream format unsupported' },
+        { status: 500 },
+      )
+    }
+
+    const retryStreamResponse = retryToUIMessageStreamResponse.call(retryRunResult)
+    const retryWrapped = wrapResponseWithContractLogging(retryStreamResponse, {
+      requiresTool: true,
+      intent: context.uiContract?.intent ?? 'informational_qna',
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+      warnMode,
+      dayIndex,
+    })
+    const retryBuffered = await bufferResponse(retryWrapped)
+    if (retryBuffered.toolDetected) {
+      return cloneResponseFromText(retryWrapped, retryBuffered.text)
+    }
+
+    writeAgentLog({
+      event: 'missing_tool_call_retry_failed',
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+    })
+
+    return cloneResponseFromText(wrapped, buffered.text)
   }
 
   return NextResponse.json({ error: 'Agent stream format unsupported' }, { status: 500 })

@@ -1,10 +1,6 @@
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-} from 'recharts'
+import { Line, LineChart, Tooltip as RechartsTooltip } from 'recharts'
 import type { SparklineDataPoint, ChartVariant } from '../chart.types'
+import { ChartResponsiveContainer } from '../ChartResponsiveContainer/ChartResponsiveContainer'
 import { ChartSkeleton } from '../ChartSkeleton/ChartSkeleton'
 import { ChartEmpty } from '../ChartEmpty/ChartEmpty'
 
@@ -32,34 +28,32 @@ export function SparklineChart({
   }
 
   return (
-    <div style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <defs>
-            <linearGradient id="sparkline-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={color} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <RechartsTooltip
-            cursor={false}
-            contentStyle={{
-              borderRadius: 8,
-              border: '1px solid var(--ns-color-border)',
-              backgroundColor: 'var(--ns-color-surface)',
-              color: 'var(--ns-color-text)',
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <ChartResponsiveContainer height={height} className="min-h-0 w-full min-w-0">
+      <LineChart data={data}>
+        <defs>
+          <linearGradient id="sparkline-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <RechartsTooltip
+          cursor={false}
+          contentStyle={{
+            borderRadius: 8,
+            border: '1px solid var(--ns-color-border)',
+            backgroundColor: 'var(--ns-color-surface)',
+            color: 'var(--ns-color-text)',
+          }}
+        />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 4 }}
+        />
+      </LineChart>
+    </ChartResponsiveContainer>
   )
 }

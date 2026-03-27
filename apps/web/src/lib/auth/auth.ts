@@ -121,7 +121,27 @@ async function resolveDatabaseAdapter() {
       },
     })
   } catch {
+    const shouldRequireDb =
+      typeof process.env['DATABASE_URL'] === 'string' &&
+      process.env['DATABASE_URL'].length > 0
+
+    const message =
+      '[novasphere/auth] Falling back to Better Auth memoryAdapter(). ' +
+      'This disables persisted users/sessions and can cause roles to default to viewer. ' +
+      'Fix: ensure @novasphere/db can be imported at runtime and DATABASE_URL is set correctly.\n'
+
+    if (shouldRequireDb) {
+      throw new Error(message)
+    }
+
     // Build/runtime fallback when DB driver modules are unavailable.
+    // Avoid console.* per repo rules; stderr is enough to surface this in dev logs.
+    try {
+      process.stderr.write(message)
+    } catch {
+      // ignore
+    }
+
     return memoryAdapter({})
   }
 }

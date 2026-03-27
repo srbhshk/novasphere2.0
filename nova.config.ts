@@ -65,7 +65,7 @@ export const novaConfig = {
     name: 'Nova',
     avatarEmoji: '◆',
     // Default local model — runs offline via Ollama
-    ollamaModel: 'qwen2.5:0.5b',
+    ollamaModel: 'qwen2.5:7b-instruct',
     // Show which AI engine is running in the CopilotPanel
     showAdapterStatus: true,
   },

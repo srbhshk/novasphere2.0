@@ -202,6 +202,15 @@ export const CEO_METRICS: CeoMetricsResponse = {
       sparkline: buildSparkline(24, 7, 0.06, 70),
       suffix: '%',
     },
+    {
+      id: 'active-users',
+      label: 'Active Users',
+      value: 12_847,
+      trend: 8.7,
+      deltaDirection: 'up',
+      unit: 'count',
+      sparkline: buildSparkline(12_847, 7, 0.04, 80),
+    },
   ],
   revenueHistory: REVENUE_HISTORY,
   churnTrend: CHURN_TREND,
@@ -249,5 +258,39 @@ export function getCeoPipelineDeals(stage?: string): PaginatedResponse<PipelineD
     stage && stage !== 'all'
       ? PIPELINE_DEALS.filter((d) => d.stage === stage)
       : PIPELINE_DEALS
+  return { items, total: items.length, page: 1, limit: items.length, hasMore: false }
+}
+
+/**
+ * Per-stage rollups for engineer/viewer roles — no deal-level company or owner detail.
+ * Values are real sums from the same underlying pipeline mock data.
+ */
+export function getPipelineStageAggregates(
+  stage?: string,
+): PaginatedResponse<PipelineDeal> {
+  const filtered =
+    stage && stage !== 'all'
+      ? PIPELINE_DEALS.filter((d) => d.stage === stage)
+      : PIPELINE_DEALS
+
+  const byStage = new Map<PipelineDealStage, PipelineDeal[]>()
+  for (const d of filtered) {
+    const list = byStage.get(d.stage) ?? []
+    list.push(d)
+    byStage.set(d.stage, list)
+  }
+
+  const items: PipelineDeal[] = [...byStage.entries()].map(([st, deals]) => ({
+    id: `agg-${st}`,
+    company: 'Stage aggregate',
+    value: deals.reduce((sum, x) => sum + x.value, 0),
+    stage: st,
+    owner: '—',
+    expectedClose: deals[0]?.expectedClose ?? isoOffset(BASE_DATE_MS, 30),
+    probability: Math.round(
+      deals.reduce((sum, x) => sum + x.probability, 0) / Math.max(deals.length, 1),
+    ),
+  }))
+
   return { items, total: items.length, page: 1, limit: items.length, hasMore: false }
 }

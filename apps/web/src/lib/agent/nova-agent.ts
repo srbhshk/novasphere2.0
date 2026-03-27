@@ -1,10 +1,11 @@
 import type { ModelMessage } from 'ai'
 import { generateText, stepCountIs, streamText } from 'ai'
-import type { AgentContext, UserRole, ProductConfig } from '@novasphere/agent-core'
+import type { AgentContext, ProductConfig, UserRole } from '@novasphere/agent-core'
 import { getSystemPrompt } from '@novasphere/agent-core'
 import { z } from 'zod'
 import { getActiveModel } from './models'
 import { genUiTools } from './genui/tools'
+import { writeAgentLog } from './observability'
 import { novaConfig } from '../../../../../nova.config'
 
 export const callOptionsSchema = z.object({
@@ -21,8 +22,40 @@ export const callOptionsSchema = z.object({
 })
 
 type AgentStreamInput =
-  | { prompt: string; messages?: never; options: AgentContext }
-  | { prompt?: never; messages: ModelMessage[]; options: AgentContext }
+  | {
+      prompt: string
+      messages?: never
+      options: AgentContext
+      forceRenderLayout?: boolean
+      forceRenderLayoutRetry?: boolean
+    }
+  | {
+      prompt?: never
+      messages: ModelMessage[]
+      options: AgentContext
+      forceRenderLayout?: boolean
+      forceRenderLayoutRetry?: boolean
+    }
+
+export function detectLayoutIntent(message: string): boolean {
+  const normalized = message.trim().toLowerCase()
+  if (normalized.length === 0) return false
+
+  const layoutPhrases = [
+    'show me',
+    'focus on',
+    'optimize',
+    'improve',
+    'dashboard',
+    'what matters',
+    'prioritize',
+    'surface',
+    'reorder',
+    'arrange',
+  ] as const
+
+  return layoutPhrases.some((phrase) => normalized.includes(phrase))
+}
 
 function toUserRole(value: string): UserRole {
   if (
@@ -48,23 +81,110 @@ function toProductConfig(context: AgentContext): ProductConfig {
   }
 }
 
-function buildSystemInstructions(context: AgentContext): string {
+function formatMetricSignal(metric: AgentContext['activeMetrics'][number]): string {
+  const hasUnit = metric.unit != null && metric.unit.length > 0
+  const rawValue = hasUnit ? `${metric.value}${metric.unit}` : `${metric.value}`
+  const deltaPrefix = metric.delta > 0 ? '+' : ''
+  const anomalyTag = metric.anomaly === true ? ' [ANOMALY]' : ''
+  return `${metric.label}: ${rawValue} (${deltaPrefix}${metric.delta}%, ${metric.deltaDirection})${anomalyTag}`
+}
+
+function summarizeContextForLLM(context: AgentContext): string {
+  const prioritizedMetrics = [...context.activeMetrics]
+    .sort((left, right) => {
+      if (left.anomaly === true && right.anomaly !== true) return -1
+      if (left.anomaly !== true && right.anomaly === true) return 1
+      return Math.abs(right.delta) - Math.abs(left.delta)
+    })
+    .slice(0, 6)
+
+  const keyMetricsSummary =
+    prioritizedMetrics.length > 0
+      ? prioritizedMetrics.map((metric) => `- ${formatMetricSignal(metric)}`).join('\n')
+      : '- none'
+
+  const anomalySignals = context.activeMetrics
+    .filter((metric) => metric.anomaly === true)
+    .map((metric) => `- ${metric.label}`)
+  const anomaliesSummary =
+    anomalySignals.length > 0 ? anomalySignals.join('\n') : '- none'
+
+  const recentActivitySummary =
+    context.recentActivity.length > 0
+      ? context.recentActivity
+          .slice(0, 5)
+          .map((event) => {
+            const severity =
+              event.severity != null ? `${event.severity.toUpperCase()} · ` : ''
+            return `- ${severity}${event.type}: ${event.message}`
+          })
+          .join('\n')
+      : '- none'
+
+  const insightsSummary =
+    context.criticalInsights != null && context.criticalInsights.length > 0
+      ? context.criticalInsights
+          .slice(0, 5)
+          .map((insight) => `- ${insight}`)
+          .join('\n')
+      : '- none'
+
+  return [
+    'CURRENT DATA STATE:',
+    `- Key metrics:`,
+    keyMetricsSummary,
+    `- Anomalies:`,
+    anomaliesSummary,
+    `- Recent activity:`,
+    recentActivitySummary,
+    `- Insights:`,
+    insightsSummary,
+  ].join('\n')
+}
+
+function buildSystemInstructions(
+  context: AgentContext,
+  overrides?: { forceRenderLayout?: boolean; forceRenderLayoutRetry?: boolean },
+): string {
   const product = toProductConfig(context)
   const role = toUserRole(context.userRole)
 
   const base = getSystemPrompt(role, product)
+  const contextSummary = summarizeContextForLLM(context)
+  const isLayoutIntent = detectLayoutIntent(context.userMessage)
+  const forceRenderLayout = overrides?.forceRenderLayout === true || isLayoutIntent
+  const forceRenderLayoutRetry = overrides?.forceRenderLayoutRetry === true
+  const strongLayoutOnlyInstruction = forceRenderLayout
+    ? [
+        'LAYOUT INTENT DETECTED:',
+        'You MUST call render_layout at least once in your response.',
+        'You may include explanation text, reasoning, and other tool calls alongside render_layout.',
+        'DO NOT return layout JSON as raw text — always use the render_layout tool.',
+        'Do NOT skip the render_layout call.',
+        forceRenderLayoutRetry
+          ? 'You did not call render_layout on the previous attempt. You MUST call it now before responding.'
+          : '',
+      ]
+        .filter((line) => line.length > 0)
+        .join('\n')
+    : ''
   const toolInstructions = [
     'You are the novasphere ToolLoopAgent. Use tools to compose the dashboard.',
-    'For concrete layout requests (examples: "show me what matters", "board meeting", "rearrange dashboard"), you MUST call render_layout exactly once before your final text response.',
-    'For anomaly explanations (examples: "Explain this anomaly: ..."), you MUST call explain_anomaly before any final text response.',
-    'Do not call render_layout for anomaly explanation requests.',
-    'For ambiguous requests that require one clarifying question, you MUST call ask_clarification and then respond with only the clarifying question text. Do not call render_layout until the user answers.',
-    'Do not ask clarifying questions when the request is specific enough to compose a layout directly.',
+    'Policy contract: use contract metadata from this request to decide whether a tool call is mandatory.',
+    'If uiContract.requiresTool is true and intent is layout_change or visibility_change, call render_layout or filter_by_relevance before final text.',
+    'If uiContract.requiresTool is true and intent is anomaly_explanation, call explain_anomaly before final text.',
+    'Never ask the user questions. If intent is clarification_required, make the best assumption and proceed as informational_qna.',
+    'If there is no meaningful structural change, you may narrate a no-op recommendation while preserving current layout.',
+    strongLayoutOnlyInstruction,
     `Tenant: ${context.tenantId} (${context.tenantPlan})`,
     `Role context: ${context.roleInProduct}`,
+    `UI contract intent: ${context.uiContract?.intent ?? 'informational_qna'}`,
+    `UI contract requiresTool: ${context.uiContract?.requiresTool === true ? 'true' : 'false'}`,
+    `UI contract allowedFallback: ${context.uiContract?.allowedFallback ?? 'none'}`,
     context.userPreferences.dashboardGoal
       ? `Dashboard goal: ${context.userPreferences.dashboardGoal}`
       : '',
+    contextSummary,
   ]
 
   return [...[base], toolInstructions.filter((line) => line.length > 0)].join('\n\n')
@@ -107,7 +227,9 @@ function buildInitialLayoutSystemInstructions(context: AgentContext): string {
 }
 
 class NovaToolLoopAgent {
-  async stream(input: AgentStreamInput): Promise<ReturnType<typeof streamText>> {
+  async stream(
+    input: AgentStreamInput,
+  ): Promise<{ toUIMessageStreamResponse: () => Response }> {
     const options = callOptionsSchema.parse({
       userId: input.options.userId,
       userRole: input.options.userRole,
@@ -122,11 +244,28 @@ class NovaToolLoopAgent {
     })
 
     const model = await getActiveModel()
-    const system = buildSystemInstructions({
-      ...input.options,
-      userPreferences: options.dashboardGoal
-        ? { ...input.options.userPreferences, dashboardGoal: options.dashboardGoal }
-        : { ...input.options.userPreferences },
+    const forceRenderLayout =
+      input.forceRenderLayout === true || detectLayoutIntent(input.options.userMessage)
+    const system = buildSystemInstructions(
+      {
+        ...input.options,
+        userPreferences: options.dashboardGoal
+          ? { ...input.options.userPreferences, dashboardGoal: options.dashboardGoal }
+          : { ...input.options.userPreferences },
+      },
+      {
+        forceRenderLayout,
+        forceRenderLayoutRetry: input.forceRenderLayoutRetry === true,
+      },
+    )
+
+    writeAgentLog({
+      event: 'agent_turn_start',
+      intent: input.options.uiContract?.intent ?? 'informational_qna',
+      requiresTool: input.options.uiContract?.requiresTool === true,
+      role: input.options.userRole,
+      tenantId: input.options.tenantId,
+      productDomain: input.options.productDomain,
     })
 
     if (input.messages != null && input.messages.length > 0) {
@@ -175,7 +314,8 @@ class NovaToolLoopAgent {
       model,
       system,
       prompt: 'Compose the initial dashboard layout for this user.',
-      tools: genUiTools,
+      tools: { render_layout: genUiTools.render_layout },
+      toolChoice: 'required',
       stopWhen: stepCountIs(5),
     })
 

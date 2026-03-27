@@ -7,7 +7,7 @@ import type {
   UserPreferences,
   UserRole,
 } from '@novasphere/agent-core'
-import { getUserPreferenceByUserId } from '@novasphere/db'
+import { db, getUserPreferenceByUserId } from '@novasphere/db'
 import {
   UI_CONTRACT_STATUS,
   allowedFallbackForIntent,
@@ -15,7 +15,7 @@ import {
   requiresToolForIntent,
 } from '@novasphere/agent-core'
 import { z } from 'zod'
-import { novaConfig } from '../../../../../nova.config'
+import { novaConfig } from 'nova.config'
 import { writeAgentLog } from './observability'
 
 type BuildAgentContextInput = {
@@ -159,15 +159,37 @@ function readOrigin(headers: Headers): string {
 }
 
 async function resolveTenantPlan(tenantId: string): Promise<TenantPlan> {
-  if (tenantId === 'demo') {
-    return 'pro'
+  const org = await db.query.organizations.findFirst({
+    where: (t, { eq }) => eq(t.id, tenantId),
+  })
+  if (org?.plan === 'free' || org?.plan === 'pro' || org?.plan === 'enterprise') {
+    return org.plan
   }
   return TENANT_PLAN_FALLBACK
 }
 
 async function resolvePermissions(tenantId: string, userId: string): Promise<string[]> {
   if (tenantId.length === 0 || userId.length === 0) return []
-  return []
+  const member = await db.query.members.findFirst({
+    where: (t, { and, eq }) => and(eq(t.organizationId, tenantId), eq(t.userId, userId)),
+  })
+  if (member == null) return []
+
+  if (member.role === 'admin') {
+    return [
+      'dashboard:read',
+      'dashboard:compose',
+      'dashboard:manage',
+      'settings:read',
+      'settings:write',
+    ]
+  }
+
+  if (member.role === 'ceo' || member.role === 'engineer') {
+    return ['dashboard:read', 'dashboard:compose', 'settings:read']
+  }
+
+  return ['dashboard:read']
 }
 
 async function resolvePreferences(

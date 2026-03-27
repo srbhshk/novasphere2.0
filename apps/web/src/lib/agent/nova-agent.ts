@@ -1,12 +1,16 @@
 import type { ModelMessage } from 'ai'
 import { generateText, stepCountIs, streamText } from 'ai'
 import type { AgentContext, ProductConfig, UserRole } from '@novasphere/agent-core'
-import { getSystemPrompt } from '@novasphere/agent-core'
+import {
+  buildInitialLayoutRoleHint,
+  buildToolLoopInstructions,
+  getSystemPrompt,
+} from '@novasphere/agent-core'
 import { z } from 'zod'
 import { getActiveModel } from './models'
 import { genUiTools } from './genui/tools'
 import { writeAgentLog } from './observability'
-import { novaConfig } from '../../../../../nova.config'
+import { novaConfig } from 'nova.config'
 
 export const callOptionsSchema = z.object({
   userId: z.string(),
@@ -154,75 +158,26 @@ function buildSystemInstructions(
   const isLayoutIntent = detectLayoutIntent(context.userMessage)
   const forceRenderLayout = overrides?.forceRenderLayout === true || isLayoutIntent
   const forceRenderLayoutRetry = overrides?.forceRenderLayoutRetry === true
-  const strongLayoutOnlyInstruction = forceRenderLayout
-    ? [
-        'LAYOUT INTENT DETECTED:',
-        'You MUST call render_layout at least once in your response.',
-        'You may include explanation text, reasoning, and other tool calls alongside render_layout.',
-        'DO NOT return layout JSON as raw text — always use the render_layout tool.',
-        'Do NOT skip the render_layout call.',
-        forceRenderLayoutRetry
-          ? 'You did not call render_layout on the previous attempt. You MUST call it now before responding.'
-          : '',
-      ]
-        .filter((line) => line.length > 0)
-        .join('\n')
-    : ''
-  const toolInstructions = [
-    'You are the novasphere ToolLoopAgent. Use tools to compose the dashboard.',
-    'Policy contract: use contract metadata from this request to decide whether a tool call is mandatory.',
-    'If uiContract.requiresTool is true and intent is layout_change or visibility_change, call render_layout or filter_by_relevance before final text.',
-    'If uiContract.requiresTool is true and intent is anomaly_explanation, call explain_anomaly before final text.',
-    'Never ask the user questions. If intent is clarification_required, make the best assumption and proceed as informational_qna.',
-    'If there is no meaningful structural change, you may narrate a no-op recommendation while preserving current layout.',
-    strongLayoutOnlyInstruction,
-    `Tenant: ${context.tenantId} (${context.tenantPlan})`,
-    `Role context: ${context.roleInProduct}`,
-    `UI contract intent: ${context.uiContract?.intent ?? 'informational_qna'}`,
-    `UI contract requiresTool: ${context.uiContract?.requiresTool === true ? 'true' : 'false'}`,
-    `UI contract allowedFallback: ${context.uiContract?.allowedFallback ?? 'none'}`,
-    context.userPreferences.dashboardGoal
-      ? `Dashboard goal: ${context.userPreferences.dashboardGoal}`
-      : '',
+  return buildToolLoopInstructions({
+    basePrompt: base,
+    tenantId: context.tenantId,
+    tenantPlan: context.tenantPlan,
+    roleInProduct: context.roleInProduct,
+    uiIntent: context.uiContract?.intent ?? 'informational_qna',
+    requiresTool: context.uiContract?.requiresTool === true,
+    allowedFallback: context.uiContract?.allowedFallback ?? 'none',
+    ...(context.userPreferences.dashboardGoal
+      ? { dashboardGoal: context.userPreferences.dashboardGoal }
+      : {}),
     contextSummary,
-  ]
-
-  return [...[base], toolInstructions.filter((line) => line.length > 0)].join('\n\n')
+    forceRenderLayout,
+    forceRenderLayoutRetry,
+  })
 }
 
 function buildInitialLayoutSystemInstructions(context: AgentContext): string {
   const base = buildSystemInstructions(context)
-  const role = context.userRole
-  const roleHint =
-    role === 'ceo'
-      ? [
-          'For this request you MUST call render_layout exactly once.',
-          'Compose a CEO executive layout with these module IDs in this order:',
-          '  Row 1 (colSpan 4 each, rowSpan 1): metric-mrr, metric-arr, metric-nrr',
-          '  Row 2 (colSpan 3 each, rowSpan 1): metric-churn, metric-arpu, metric-ltv, metric-conversion',
-          '  Row 3 (colSpan 8+4, rowSpan 2): chart-revenue-comparison, chart-pipeline',
-          '  Row 4 (colSpan 6+6, rowSpan 2): chart-top-customers, customer-table',
-        ].join('\n')
-      : role === 'engineer'
-        ? [
-            'For this request you MUST call render_layout exactly once.',
-            'Compose an Engineer operational layout with these module IDs:',
-            '  Row 1 (colSpan 3 each, rowSpan 1): metric-api-latency, metric-error-rate, metric-uptime, metric-request-volume',
-            '  Row 2 (colSpan 8+4, rowSpan 2): chart-response-time, chart-error-breakdown',
-            '  Row 3 (colSpan 6+6, rowSpan 2): deployment-log, system-alerts',
-          ].join('\n')
-        : role === 'admin'
-          ? [
-              'For this request you MUST call render_layout exactly once.',
-              'Compose an Admin platform layout with these module IDs:',
-              '  Row 1 (colSpan 4 each, rowSpan 1): metric-users, metric-new-signups, metric-active-orgs',
-              '  Row 2 (colSpan 4+8, rowSpan 2): chart-plan-distribution, chart-user-growth',
-              '  Row 3 (colSpan 6+6, rowSpan 2): activity-feed, pipeline-table',
-            ].join('\n')
-          : [
-              'For this request you MUST call render_layout exactly once.',
-              'Compose a Viewer concise layout: metric-mrr (colSpan 6), metric-users (colSpan 6), chart-revenue (colSpan 8 rowSpan 2), chart-pipeline (colSpan 4 rowSpan 2), activity-feed (colSpan 12 rowSpan 2).',
-            ].join('\n')
+  const roleHint = buildInitialLayoutRoleHint(context.userRole)
   return `${base}\n\n${roleHint}\nEach card must have: moduleId (exact string from vocabulary), colSpan (3-12), rowSpan (1-3), order (0-based), visible true. Include a short descriptive title for each card.`
 }
 

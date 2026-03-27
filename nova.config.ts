@@ -15,7 +15,7 @@
 export const novaConfig = {
   product: {
     // The name of the product this dashboard is deployed in
-    name: 'novasphere Demo',
+    name: 'Novasphere Demo',
 
     // Short domain identifier — used to select terminology
     // Examples: 'infrastructure' | 'fintech' | 'healthcare' | 'saas'

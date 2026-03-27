@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ENGINEER_DEPLOYMENTS } from '@/mocks/engineer.mock'
+import { resolveRoleFromSession } from '@/lib/auth/resolve-role'
 
 const querySchema = z.object({
   environment: z.enum(['all', 'production', 'staging']).default('all'),
@@ -11,7 +12,7 @@ const querySchema = z.object({
 })
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const role = request.headers.get('x-user-role')
+  const role = await resolveRoleFromSession(request)
 
   if (role !== 'engineer' && role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden: insufficient role' }, { status: 403 })

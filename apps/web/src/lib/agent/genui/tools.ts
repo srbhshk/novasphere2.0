@@ -1,41 +1,8 @@
 import type { ToolSet } from 'ai'
 import { z } from 'zod'
-import type { MODULE_REGISTRY } from '@/app/(dashboard)/[tenant]/dashboard/modules/registry'
+import { VALID_MODULE_IDS } from '@/lib/genui/module-ids'
 
-export const VALID_MODULE_IDS = [
-  'metric-mrr',
-  'metric-arr',
-  'metric-nrr',
-  'metric-churn',
-  'metric-arpu',
-  'metric-ltv',
-  'metric-conversion',
-  'metric-users',
-  'metric-new-signups',
-  'metric-active-orgs',
-  'metric-api-latency',
-  'metric-error-rate',
-  'metric-uptime',
-  'metric-request-volume',
-  'chart-revenue',
-  'chart-revenue-comparison',
-  'chart-churn-trend',
-  'chart-user-growth',
-  'chart-top-customers',
-  'chart-pipeline',
-  'chart-plan-distribution',
-  'chart-feature-adoption',
-  'chart-response-time',
-  'chart-error-breakdown',
-  'chart-activity',
-  'chart-sparkline',
-  'customer-table',
-  'pipeline-table',
-  'activity-feed',
-  'deployment-log',
-  'system-alerts',
-  'anomaly-banner',
-] as const satisfies readonly (keyof typeof MODULE_REGISTRY)[]
+export { VALID_MODULE_IDS }
 
 const moduleIdSchema = z.enum(VALID_MODULE_IDS)
 const confidenceSchema = z.enum(['high', 'medium', 'low'])
@@ -158,6 +125,12 @@ export const genUiTools = {
     execute: async (input) =>
       parseToolInputOrThrow('render_component', renderComponentSchema, input),
   },
+  ask_clarification: {
+    description: 'Ask a clarifying question and provide selectable options',
+    inputSchema: askClarificationSchema,
+    execute: async (input) =>
+      parseToolInputOrThrow('ask_clarification', askClarificationSchema, input),
+  },
   explain_anomaly: {
     description: 'Provide cross-signal reasoning about an anomaly',
     inputSchema: explainAnomalySchema,
@@ -177,6 +150,7 @@ export type GenUiToolName = keyof typeof genUiTools
 export const toolInputSchemas = {
   render_layout: renderLayoutSchema,
   render_component: renderComponentSchema,
+  ask_clarification: askClarificationSchema,
   explain_anomaly: explainAnomalySchema,
   filter_by_relevance: filterByRelevanceSchema,
 } as const

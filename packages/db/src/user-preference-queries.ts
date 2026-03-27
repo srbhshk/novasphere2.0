@@ -40,6 +40,12 @@ export type UpsertUserThemePresetInput = {
   themePreset: string
 }
 
+export type UpsertUserDashboardGoalInput = {
+  userId: string
+  organizationId: string
+  dashboardGoal: string
+}
+
 /**
  * Persists theme preset for a user. Uses SQLite/libsql driver shape (dev default).
  */
@@ -62,6 +68,29 @@ export async function upsertUserThemePreset(
     userId: input.userId,
     organizationId: input.organizationId,
     themePreset: input.themePreset,
+    updatedAt: now,
+  })
+}
+
+export async function upsertUserDashboardGoal(
+  input: UpsertUserDashboardGoalInput,
+): Promise<void> {
+  const sqliteDb = db as unknown as LibSQLDatabase<typeof schema>
+  const now = new Date()
+  const existing = await getUserPreferenceByUserId(input.userId)
+  if (existing != null) {
+    await sqliteDb
+      .update(userPreferences)
+      .set({ dashboardGoal: input.dashboardGoal, updatedAt: now })
+      .where(eq(userPreferences.userId, input.userId))
+    return
+  }
+
+  await sqliteDb.insert(userPreferences).values({
+    id: `pref_${input.userId}`,
+    userId: input.userId,
+    organizationId: input.organizationId,
+    dashboardGoal: input.dashboardGoal,
     updatedAt: now,
   })
 }

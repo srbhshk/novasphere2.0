@@ -1,5 +1,6 @@
 import type { BentoCardConfig, SuggestionChip } from '@novasphere/agent-core'
 import type { ZodError, ZodIssue } from 'zod'
+import { writeAgentLog } from '@/lib/agent/observability'
 import type { GenUiToolName } from './tools'
 import { toolInputSchemas } from './tools'
 
@@ -54,6 +55,7 @@ const TOOL_SCHEMA_BY_NAME: Record<
 > = {
   render_layout: toolInputSchemas.render_layout,
   render_component: toolInputSchemas.render_component,
+  ask_clarification: toolInputSchemas.ask_clarification,
   explain_anomaly: toolInputSchemas.explain_anomaly,
   filter_by_relevance: toolInputSchemas.filter_by_relevance,
 }
@@ -169,6 +171,7 @@ function validateToolArgs(
 
   return {
     success: true,
+    // Safety: parsed.data passed the tool-specific Zod schema; values are plain object fields.
     args: parsed.data as Record<string, unknown>,
   }
 }
@@ -201,7 +204,9 @@ function toBentoCardConfig(value: unknown): BentoCardConfig | null {
   return {
     id,
     moduleId,
+    // Safety: Zod already constrained these numeric ranges in the tool schema.
     colSpan: colSpan as BentoCardConfig['colSpan'],
+    // Safety: Zod already constrained these numeric ranges in the tool schema.
     rowSpan: rowSpan as BentoCardConfig['rowSpan'],
     visible,
     order,
@@ -355,6 +360,27 @@ export function executeToolCall(
       return { status: 'applied' }
     }
 
+    if (toolName === 'ask_clarification') {
+      const question = safeArgs['question']
+      const options = safeArgs['options']
+      if (typeof question !== 'string' || !Array.isArray(options)) {
+        throw new Error('ask_clarification requires a question and options array.')
+      }
+
+      const chips = options
+        .filter(
+          (option): option is string => typeof option === 'string' && option.length > 0,
+        )
+        .map((option, index) => ({
+          id: `clarify-${index + 1}`,
+          label: option,
+          action: `${question} ${option}`,
+        }))
+
+      stores.agentStore.setSuggestions(chips)
+      return { status: 'applied' }
+    }
+
     if (toolName === 'explain_anomaly') {
       const signals = safeArgs['signals']
       const hypothesis = safeArgs['hypothesis']
@@ -451,6 +477,10 @@ export function logToolExecutionFailure(
   toolName: GenUiToolName,
   result: ToolValidationFailure | ToolExecutionFailure,
 ): void {
-  void toolName
-  void result
+  writeAgentLog({
+    level: 'error',
+    event: 'genui_tool_failure',
+    toolName,
+    result,
+  })
 }

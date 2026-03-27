@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCeoPipelineDeals, getPipelineStageAggregates } from '@/mocks/ceo.mock'
+import { resolveRoleFromSession } from '@/lib/auth/resolve-role'
 
 const querySchema = z.object({
   stage: z
@@ -8,20 +9,8 @@ const querySchema = z.object({
     .default('all'),
 })
 
-function resolveRole(header: string | null): 'admin' | 'ceo' | 'engineer' | 'viewer' {
-  if (
-    header === 'admin' ||
-    header === 'ceo' ||
-    header === 'engineer' ||
-    header === 'viewer'
-  ) {
-    return header
-  }
-  return 'viewer'
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
-  const role = resolveRole(request.headers.get('x-user-role'))
+  const role = await resolveRoleFromSession(request)
 
   const url = new URL(request.url)
   const params = querySchema.safeParse({

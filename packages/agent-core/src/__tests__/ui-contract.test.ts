@@ -14,7 +14,7 @@ describe('ui action contract', () => {
     )
   })
 
-  it('classifies ambiguity as clarification_required', () => {
+  it('classifies empty prompts as informational_qna', () => {
     expect(classifyUiIntent('')).toBe(UI_INTENT.informationalQna)
   })
 

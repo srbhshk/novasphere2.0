@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { DEFAULT_OLLAMA_MODEL } from './agent/ollama-defaults'
 
 const serverSchema = z.object({
-  BETTER_AUTH_SECRET: z.string().min(32).optional(),
+  BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
@@ -14,6 +14,7 @@ const serverSchema = z.object({
   DATABASE_URL: z.string().min(1).default('file:./dev.db'),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
+  AI_PROVIDER: z.enum(['auto', 'ollama', 'claude', 'openai']).default('auto'),
   RATE_LIMIT_AGENT_RPM: z.coerce.number().int().positive().default(20),
 })
 
@@ -47,6 +48,7 @@ export const {
   DATABASE_URL,
   ANTHROPIC_API_KEY,
   OPENAI_API_KEY,
+  AI_PROVIDER,
   RATE_LIMIT_AGENT_RPM,
   NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_DATA_SOURCE,

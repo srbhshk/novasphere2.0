@@ -5,6 +5,7 @@ import * as React from 'react'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
 import { useChat } from '@ai-sdk/react'
+import { usePathname } from 'next/navigation'
 
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
@@ -41,6 +42,7 @@ export function CopilotChatProvider({
   const userId = authSession?.userId ?? 'anonymous'
   const tenantId = authSession?.tenantId ?? 'demo'
   const agentRole = normalizeAgentRole(authSession?.role)
+  const pathname = usePathname()
 
   // Keep transport stable across route changes so chat state persists across pages.
   const transport = React.useMemo(
@@ -51,9 +53,10 @@ export function CopilotChatProvider({
           'x-user-id': userId,
           'x-user-role': agentRole,
           'x-tenant-id': tenantId,
+          'x-current-route': pathname,
         },
       }),
-    [userId, agentRole, tenantId],
+    [userId, agentRole, tenantId, pathname],
   )
 
   const { messages, sendMessage, status } = useChat({ transport })

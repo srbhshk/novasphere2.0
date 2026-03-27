@@ -12,6 +12,7 @@ export default defineConfig({
     'react-dom',
     '@novasphere/tokens',
     '@radix-ui/react-slot',
+    '@radix-ui/react-tooltip',
     'lucide-react',
   ],
   esbuildOptions(options) {

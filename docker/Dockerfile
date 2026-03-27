@@ -55,7 +55,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/packages/db ./packages/db
 COPY --from=builder --chown=nextjs:nodejs /app/packages/db/node_modules ./packages/db/node_modules
+COPY --chown=nextjs:nodejs ./docker/web-entrypoint.sh ./docker/web-entrypoint.sh
 
 # pnpm workspaces keep many packages under package-local node_modules (symlinked to the pnpm store).
 # Next.js standalone server resolves some dependencies from /app/node_modules, so we expose drizzle-orm there.
@@ -65,6 +67,7 @@ RUN ln -sfn /app/packages/db/node_modules/drizzle-orm /app/node_modules/drizzle-
 
 # Writable directory for SQLite database
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+RUN chmod +x /app/docker/web-entrypoint.sh
 
 USER nextjs
 
@@ -73,4 +76,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # next.config.ts must set output: 'standalone' for this to work
-CMD ["node", "apps/web/server.js"]
+CMD ["/app/docker/web-entrypoint.sh"]

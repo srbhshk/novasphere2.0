@@ -44,7 +44,8 @@ function fromDb(org: Organization, cfg: DbTenantConfig | undefined): TenantConfi
 }
 
 export async function resolveTenant(organizationId: string): Promise<TenantConfig> {
-  const dataSource = process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
+  const dataSource =
+    process.env['DATA_SOURCE'] ?? process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
   if (dataSource === 'mock') {
     return { ...FALLBACK_TENANT, id: organizationId }
   }
@@ -71,7 +72,8 @@ export async function resolveTenant(organizationId: string): Promise<TenantConfi
 }
 
 export async function resolveTenantBySlug(slug: string): Promise<TenantConfig> {
-  const dataSource = process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
+  const dataSource =
+    process.env['DATA_SOURCE'] ?? process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
   if (dataSource === 'mock') {
     return { ...FALLBACK_TENANT, slug }
   }

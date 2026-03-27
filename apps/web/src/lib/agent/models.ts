@@ -81,11 +81,38 @@ export async function createOpenAIModel(): Promise<LanguageModel | null> {
   return openai('gpt-4o-mini')
 }
 
+async function isOllamaReachable(): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
+
+  try {
+    const response = await fetch(`${env.OLLAMA_BASE_URL}/api/tags`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function getActiveModel(): Promise<LanguageModel> {
-  // Priority order required by task: Ollama -> Claude -> OpenAI.
-  const ollamaModel = createOllamaModel()
-  if (ollamaModel) {
-    return ollamaModel
+  if (env.AI_PROVIDER === 'claude') {
+    const model = await createClaudeModel()
+    if (model) return model
+    throw new Error('AI_PROVIDER=claude requires ANTHROPIC_API_KEY')
+  }
+
+  if (env.AI_PROVIDER === 'openai') {
+    const model = await createOpenAIModel()
+    if (model) return model
+    throw new Error('AI_PROVIDER=openai requires OPENAI_API_KEY')
+  }
+
+  if (env.AI_PROVIDER === 'ollama') {
+    return createOllamaModel()
   }
 
   const claudeModel = await createClaudeModel()
@@ -96,6 +123,12 @@ export async function getActiveModel(): Promise<LanguageModel> {
   const openaiModel = await createOpenAIModel()
   if (openaiModel) {
     return openaiModel
+  }
+
+  if (!(await isOllamaReachable())) {
+    throw new Error(
+      'No AI provider available: set ANTHROPIC_API_KEY or OPENAI_API_KEY, or start Ollama.',
+    )
   }
 
   return createOllamaModel()

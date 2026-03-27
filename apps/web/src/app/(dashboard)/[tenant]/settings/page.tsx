@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Settings, Palette, FlaskConical, User } from 'lucide-react'
 import { GlassCard, GlassPanel, Badge } from '@novasphere/ui-glass'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
@@ -32,6 +32,28 @@ export default function SettingsPage(): React.JSX.Element {
   const resetLayout = useLayoutStore((s) => s.resetLayout)
   const [demoRole, setDemoRole] = useState<AgentRole>(role)
   const [resetConfirmed, setResetConfirmed] = useState(false)
+  const [dashboardGoal, setDashboardGoal] = useState('')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  )
+
+  useEffect(() => {
+    let mounted = true
+    void fetch('/api/user/preferences')
+      .then((response) => response.json() as Promise<{ dashboardGoal?: string | null }>)
+      .then((payload) => {
+        if (!mounted) return
+        setDashboardGoal(payload.dashboardGoal ?? '')
+      })
+      .catch(() => {
+        if (!mounted) return
+        setDashboardGoal('')
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   function applyDemoRole(r: AgentRole): void {
     setDemoRole(r)
@@ -135,6 +157,53 @@ export default function SettingsPage(): React.JSX.Element {
                 Click a swatch to apply
               </span>
             </div>
+          </GlassCard>
+
+          <GlassCard variant="medium" className="flex flex-col gap-4 p-6">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--ns-color-text)]">
+                Dashboard Goal
+              </h2>
+              <p className="mt-1 text-xs text-[var(--ns-color-muted)]">
+                This is injected into the AI context to guide layout composition.
+              </p>
+            </div>
+            <textarea
+              value={dashboardGoal}
+              onChange={(event) => setDashboardGoal(event.target.value)}
+              rows={3}
+              className="rounded-lg border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] px-3 py-2 text-sm text-[var(--ns-color-text)] outline-none focus:border-[var(--ns-color-accent)]/60"
+              placeholder="e.g. Prepare board-ready growth narrative"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSaveState('saving')
+                void fetch('/api/user/preferences', {
+                  method: 'PATCH',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify({ dashboardGoal }),
+                })
+                  .then((response) => {
+                    if (!response.ok) throw new Error('Failed to save')
+                    setSaveState('saved')
+                    setTimeout(() => setSaveState('idle'), 2000)
+                  })
+                  .catch(() => {
+                    setSaveState('error')
+                    setTimeout(() => setSaveState('idle'), 2000)
+                  })
+              }}
+              className="w-fit rounded-lg border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] px-4 py-2 text-sm text-[var(--ns-color-text)] transition-colors hover:border-[var(--ns-color-accent)]/50 hover:text-[var(--ns-color-accent)]"
+            >
+              {saveState === 'saving'
+                ? 'Saving...'
+                : saveState === 'saved'
+                  ? 'Saved'
+                  : saveState === 'error'
+                    ? 'Retry save'
+                    : 'Save goal'}
+            </button>
           </GlassCard>
 
           <GlassCard variant="medium" className="flex flex-col gap-4 p-6">

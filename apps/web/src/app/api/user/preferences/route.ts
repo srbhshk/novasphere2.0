@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { getUserPreferenceByUserId, upsertUserThemePreset } from '@novasphere/db'
+import {
+  getUserPreferenceByUserId,
+  upsertUserDashboardGoal,
+  upsertUserThemePreset,
+} from '@novasphere/db'
 import { createAuth } from '@/lib/auth/auth'
 import { isValidThemePreset } from '@/lib/theme-presets'
 
@@ -28,7 +32,13 @@ export async function GET(): Promise<NextResponse> {
   }
 
   const row = await getUserPreferenceByUserId(session.user.id)
-  return NextResponse.json({ themePreset: row?.themePreset ?? null }, { status: 200 })
+  return NextResponse.json(
+    {
+      themePreset: row?.themePreset ?? null,
+      dashboardGoal: row?.dashboardGoal ?? null,
+    },
+    { status: 200 },
+  )
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
@@ -42,21 +52,40 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (!isRecord(body)) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
-  const raw = body['themePreset']
-  if (typeof raw !== 'string') {
-    return NextResponse.json({ error: 'Invalid themePreset' }, { status: 400 })
-  }
-  if (!isValidThemePreset(raw)) {
-    return NextResponse.json({ error: 'Invalid themePreset' }, { status: 400 })
+  const rawThemePreset = body['themePreset']
+  const rawDashboardGoal = body['dashboardGoal']
+  const nextThemePreset =
+    typeof rawThemePreset === 'string' && isValidThemePreset(rawThemePreset)
+      ? rawThemePreset
+      : null
+  const nextDashboardGoal =
+    typeof rawDashboardGoal === 'string' && rawDashboardGoal.trim().length > 0
+      ? rawDashboardGoal.trim()
+      : null
+  if (nextThemePreset == null && nextDashboardGoal == null) {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
   const organizationId = readActiveOrganizationId(session)
 
-  await upsertUserThemePreset({
-    userId: session.user.id,
-    organizationId,
-    themePreset: raw,
-  })
+  if (nextThemePreset != null) {
+    await upsertUserThemePreset({
+      userId: session.user.id,
+      organizationId,
+      themePreset: nextThemePreset,
+    })
+  }
 
-  return NextResponse.json({ themePreset: raw }, { status: 200 })
+  if (nextDashboardGoal != null) {
+    await upsertUserDashboardGoal({
+      userId: session.user.id,
+      organizationId,
+      dashboardGoal: nextDashboardGoal,
+    })
+  }
+
+  return NextResponse.json(
+    { themePreset: nextThemePreset, dashboardGoal: nextDashboardGoal },
+    { status: 200 },
+  )
 }

@@ -19,6 +19,11 @@
   --color-accent: var(--ns-color-accent);
 }
 
+:root {
+  --ns-copilot-width: 380px;
+  --ns-copilot-gap: 16px;
+}
+
 html,
 body {
   min-height: 100%;

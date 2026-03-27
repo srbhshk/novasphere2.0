@@ -72,6 +72,39 @@ function getLastUserMessage(messages: Array<Record<string, unknown>>): string {
   return ''
 }
 
+function summarizeConversationHistory(messages: Array<Record<string, unknown>>): string {
+  const recent = messages.slice(-8)
+  const summaryLines: string[] = []
+
+  for (const message of recent) {
+    const role = message['role']
+    if (role !== 'user' && role !== 'assistant') continue
+
+    const content = message['content']
+    if (typeof content === 'string' && content.length > 0) {
+      summaryLines.push(`${role}: ${content}`)
+      continue
+    }
+
+    if (Array.isArray(content)) {
+      const textParts = content
+        .filter(
+          (part): part is Record<string, unknown> =>
+            typeof part === 'object' &&
+            part !== null &&
+            (part as Record<string, unknown>)['type'] === 'text',
+        )
+        .map((part) => part['text'])
+        .filter((text): text is string => typeof text === 'string' && text.length > 0)
+      if (textParts.length > 0) {
+        summaryLines.push(`${role}: ${textParts.join(' ')}`)
+      }
+    }
+  }
+
+  return summaryLines.join('\n')
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -173,7 +206,6 @@ function inspectToolMarker(chunk: string): boolean {
   }
 
   const lines = chunk.split('\n')
-  let sawParsableJson = false
 
   for (const rawLine of lines) {
     const line = rawLine.trim()
@@ -185,7 +217,6 @@ function inspectToolMarker(chunk: string): boolean {
       if (payload.length === 0 || payload === '[DONE]') continue
       const parsed = tryParseJson(payload)
       if (parsed == null) continue
-      sawParsableJson = true
       if (containsToolEvent(parsed)) return true
       continue
     }
@@ -194,14 +225,13 @@ function inspectToolMarker(chunk: string): boolean {
     if (line.startsWith('{') || line.startsWith('[')) {
       const parsed = tryParseJson(line)
       if (parsed == null) continue
-      sawParsableJson = true
       if (containsToolEvent(parsed)) return true
     }
   }
 
   // If this chunk contains parsable JSON and none had tool events, return false.
   // If this chunk is partial/unparseable, we intentionally return false to avoid false positives.
-  return sawParsableJson ? false : false
+  return false
 }
 
 async function bufferResponse(
@@ -353,23 +383,31 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
   }
 
+  // Safety: request payload is validated by `useChatBodySchema` before it is consumed.
   const rawBody = (await request.json()) as Record<string, unknown>
 
   const useChatParsed = useChatBodySchema.safeParse(rawBody)
   let userMessage: string
   let currentRoute: string
+  let conversationHistory: string
   let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>> | undefined
 
   if (!useChatParsed.success || useChatParsed.data.messages.length === 0) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  // Safety: messages have passed schema validation and are object-like entries.
   userMessage = getLastUserMessage(
     useChatParsed.data.messages as Array<Record<string, unknown>>,
   )
+  conversationHistory = summarizeConversationHistory(
+    useChatParsed.data.messages as Array<Record<string, unknown>>,
+  )
+  // Safety: headers return string|null and the null case is handled by fallback.
   currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
   try {
     modelMessages = await convertToModelMessages(
+      // Safety: validated useChat payload matches AI SDK model message conversion input.
       useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
       {
         tools: genUiTools,
@@ -388,7 +426,7 @@ export async function POST(request: Request): Promise<Response> {
   const context = await buildAgentContext({
     headers: contextHeaders,
     userMessage,
-    conversationHistory: '',
+    conversationHistory,
     currentRoute,
   })
 
@@ -410,9 +448,10 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: 'Agent stream unavailable' }, { status: 500 })
   }
 
-  const toUIMessageStreamResponse = (
-    runResult as { toUIMessageStreamResponse?: () => Response }
-  ).toUIMessageStreamResponse
+  const toUIMessageStreamResponse =
+    // Safety: AI SDK stream result exposes an optional `toUIMessageStreamResponse` method.
+    (runResult as { toUIMessageStreamResponse?: () => Response })
+      .toUIMessageStreamResponse
   if (typeof toUIMessageStreamResponse === 'function') {
     const streamResponse = toUIMessageStreamResponse.call(runResult)
     const { warnMode, dayIndex } = getWarnModeStatus()
@@ -469,9 +508,10 @@ export async function POST(request: Request): Promise<Response> {
             forceRenderLayoutRetry: true,
           })
 
-    const retryToUIMessageStreamResponse = (
-      retryRunResult as { toUIMessageStreamResponse?: () => Response }
-    ).toUIMessageStreamResponse
+    const retryToUIMessageStreamResponse =
+      // Safety: retry stream result uses the same optional response factory shape.
+      (retryRunResult as { toUIMessageStreamResponse?: () => Response })
+        .toUIMessageStreamResponse
     if (typeof retryToUIMessageStreamResponse !== 'function') {
       return NextResponse.json(
         { error: 'Agent stream format unsupported' },

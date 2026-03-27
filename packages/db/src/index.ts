@@ -4,9 +4,11 @@ export * from './schema'
 export * from './types'
 export {
   getUserPreferenceByUserId,
+  upsertUserDashboardGoal,
   upsertUserThemePreset,
 } from './user-preference-queries'
 export type {
+  UpsertUserDashboardGoalInput,
   UpsertUserThemePresetInput,
   UserPreferenceRow,
 } from './user-preference-queries'

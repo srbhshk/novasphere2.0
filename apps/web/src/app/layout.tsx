@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import * as React from 'react'
 
-import { novaConfig } from '../../../../nova.config'
+import { novaConfig } from 'nova.config'
 import {
   isValidThemePreset,
   normalizeThemePreset,

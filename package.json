@@ -9,6 +9,7 @@
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
     "test": "turbo test",
+    "e2e": "playwright test",
     "verify": "turbo run build typecheck lint test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -26,8 +27,10 @@
     ]
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
     "@changesets/cli": "latest",
+    "@playwright/test": "^1.58.2",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -39,16 +42,15 @@
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.4.3",
     "jsdom": "^22.1.0",
+    "lint-staged": "^15.4.3",
     "prettier": "latest",
     "prettier-plugin-tailwindcss": "latest",
     "tsup": "^8.5.1",
     "turbo": "latest",
     "typescript": "^5.9.3",
     "vite": "^7.0.0",
-    "vitest": "4.1.1",
-    "@radix-ui/react-slot": "^1.1.0"
+    "vitest": "4.1.1"
   },
   "pnpm": {
     "overrides": {

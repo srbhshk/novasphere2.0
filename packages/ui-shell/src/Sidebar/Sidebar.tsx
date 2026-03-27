@@ -43,7 +43,7 @@ export default function Sidebar({
           )}
         </div>
 
-        <nav className="mt-2 flex flex-1 flex-col items-center justify-center gap-1">
+        <nav className="mt-2 flex flex-1 flex-col items-center justify-center gap-6">
           {tenant.navItems.map((item) => (
             <NavItem
               key={item.id}

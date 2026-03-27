@@ -93,6 +93,8 @@ export type MetricSnapshot = {
   value: number
   delta: number
   deltaDirection: MetricDeltaDirection
+  trend?: 'up' | 'down' | 'stable'
+  anomaly?: boolean
   unit?: string
 }
 
@@ -104,4 +106,43 @@ export type ActivityEvent = {
   message: string
   timestamp: number
   severity?: ActivitySeverity
+}
+
+export const UI_INTENT = {
+  layoutChange: 'layout_change',
+  visibilityChange: 'visibility_change',
+  anomalyExplanation: 'anomaly_explanation',
+  informationalQna: 'informational_qna',
+  clarificationRequired: 'clarification_required',
+} as const
+
+export type UiIntent = (typeof UI_INTENT)[keyof typeof UI_INTENT]
+
+export const UI_CONTRACT_FALLBACK = {
+  askClarification: 'ask_clarification',
+  none: 'none',
+} as const
+
+export type UiContractFallback =
+  (typeof UI_CONTRACT_FALLBACK)[keyof typeof UI_CONTRACT_FALLBACK]
+
+export const UI_CONTRACT_STATUS = {
+  compliant: 'compliant',
+  warnViolation: 'warn_violation',
+  enforceViolation: 'enforce_violation',
+} as const
+
+export type UiContractStatus =
+  (typeof UI_CONTRACT_STATUS)[keyof typeof UI_CONTRACT_STATUS]
+
+export type UiActionContractDecision = {
+  intent: UiIntent
+  requiresTool: boolean
+  allowedFallback: UiContractFallback
+}
+
+export type UiActionContractResult = UiActionContractDecision & {
+  toolDetected: boolean
+  status: UiContractStatus
+  violationReason?: string
 }

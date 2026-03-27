@@ -7,6 +7,8 @@ export type {
   BarDataPoint,
 } from './chart.types'
 
+export type { ChartResponsiveContainerProps } from './ChartResponsiveContainer/ChartResponsiveContainer'
+export { ChartResponsiveContainer } from './ChartResponsiveContainer/ChartResponsiveContainer'
 export type { ChartSkeletonProps } from './ChartSkeleton/ChartSkeleton'
 export { ChartSkeleton } from './ChartSkeleton/ChartSkeleton'
 export type { ChartEmptyProps } from './ChartEmpty/ChartEmpty'

@@ -28,8 +28,10 @@ export function AnomalyBannerModule({ config }: BentoCardModuleProps): React.JSX
         ? 'text-[var(--ns-color-warning)]'
         : 'text-[var(--ns-color-muted)]'
 
+  const wrapperTitle = config.title ? undefined : 'Anomaly Signal'
+
   return (
-    <ModuleWrapper title={config.title ?? 'Anomaly Signal'}>
+    <ModuleWrapper title={wrapperTitle}>
       <div className="flex h-full flex-col gap-3">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-[var(--ns-color-warning)]" />

@@ -11,19 +11,23 @@ import { Button } from '../form-primitives'
 export type UserMenuProps = {
   adapter: AuthAdapter
   session: AuthSession | null
+  onSignOut?: () => void
   className?: string
 }
 
 export function UserMenu({
   adapter,
   session,
+  onSignOut,
   className,
 }: UserMenuProps): React.JSX.Element {
   if (session == null) {
     return (
       <Button
         type="button"
-        onClick={() => {}}
+        onClick={() => {
+          window.location.href = '/sign-in'
+        }}
         {...(className != null ? { className } : {})}
         aria-label="Sign in"
       >
@@ -94,7 +98,10 @@ export function UserMenu({
               <button
                 type="button"
                 className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-[color:var(--ns-color-danger)] hover:bg-[color:var(--ns-glass-bg-subtle)]"
-                onClick={() => adapter.signOut()}
+                onClick={async () => {
+                  await adapter.signOut()
+                  onSignOut?.()
+                }}
               >
                 <LogOut className="h-4 w-4" />
                 Sign out

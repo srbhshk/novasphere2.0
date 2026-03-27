@@ -60,27 +60,27 @@ function MetricCardInner({
   const trendSign = metric.trend >= 0 ? '+' : ''
 
   return (
-    <div className="flex h-full flex-col justify-between">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
+    <div className="flex h-full items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--ns-color-accent)]/10">
-            <Icon className="h-4 w-4 text-[var(--ns-color-accent)]" />
+            <Icon className="h-4 w-4 text-[var(--ns-color-accent)]" aria-hidden="true" />
           </div>
-          <span className="text-xs font-medium text-[var(--ns-color-muted)]">
+          <span className="truncate text-xs font-medium text-[var(--ns-color-muted)]">
             {metric.label}
           </span>
         </div>
         {metric.anomaly ? (
-          <span className="flex items-center gap-1 rounded-full bg-[var(--ns-color-error)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--ns-color-error)]">
-            <AlertCircle className="h-3 w-3" /> Signal
+          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[var(--ns-color-error)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--ns-color-error)]">
+            <AlertCircle className="h-3 w-3" aria-hidden="true" /> Signal
           </span>
         ) : null}
       </div>
-      <div>
-        <div className="text-2xl font-bold tracking-tight text-[var(--ns-color-text)]">
+      <div className="shrink-0 text-right">
+        <div className="text-2xl font-bold tracking-tight text-[var(--ns-color-text)] tabular-nums">
           {formatValue(metric)}
         </div>
-        <div className={`mt-1 text-xs font-medium ${trendColor}`}>
+        <div className={`mt-1 text-xs font-medium tabular-nums ${trendColor}`}>
           {trendSign}
           {metric.trend.toFixed(1)}% vs last month
         </div>
@@ -103,14 +103,16 @@ function MetricSkeleton(): React.JSX.Element {
 
 // --- CEO / Admin metric modules ---
 
-export function MetricMRRModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricMRRModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'mrr',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -120,14 +122,16 @@ export function MetricMRRModule({ config }: BentoCardModuleProps): React.JSX.Ele
   )
 }
 
-export function MetricARRModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricARRModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'arr',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -137,14 +141,16 @@ export function MetricARRModule({ config }: BentoCardModuleProps): React.JSX.Ele
   )
 }
 
-export function MetricNRRModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricNRRModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'nrr',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -154,14 +160,16 @@ export function MetricNRRModule({ config }: BentoCardModuleProps): React.JSX.Ele
   )
 }
 
-export function MetricChurnModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricChurnModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'churn',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -171,14 +179,16 @@ export function MetricChurnModule({ config }: BentoCardModuleProps): React.JSX.E
   )
 }
 
-export function MetricARPUModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricARPUModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'arpu',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -188,14 +198,16 @@ export function MetricARPUModule({ config }: BentoCardModuleProps): React.JSX.El
   )
 }
 
-export function MetricLTVModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricLTVModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'ltv',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -206,7 +218,7 @@ export function MetricLTVModule({ config }: BentoCardModuleProps): React.JSX.Ele
 }
 
 export function MetricConversionModule({
-  config,
+  config: _config,
 }: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const { data, isLoading } = useDashboardMetrics(role === 'engineer' ? 'ceo' : role)
@@ -214,7 +226,7 @@ export function MetricConversionModule({
     (k) => k.id === 'conversion',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -224,7 +236,9 @@ export function MetricConversionModule({
   )
 }
 
-export function MetricUsersModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricUsersModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { role } = useCurrentRole()
   const r = role === 'engineer' ? 'admin' : role
   const { data, isLoading } = useDashboardMetrics(r)
@@ -232,7 +246,7 @@ export function MetricUsersModule({ config }: BentoCardModuleProps): React.JSX.E
     (k) => k.id === 'total-users' || k.id === 'active-users',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -294,14 +308,14 @@ export function MetricApiLatencyModule({
 }
 
 export function MetricErrorRateModule({
-  config,
+  config: _config,
 }: BentoCardModuleProps): React.JSX.Element {
   const { data, isLoading } = useDashboardMetrics('engineer')
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'error-rate',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -311,13 +325,15 @@ export function MetricErrorRateModule({
   )
 }
 
-export function MetricUptimeModule({ config }: BentoCardModuleProps): React.JSX.Element {
+export function MetricUptimeModule({
+  config: _config,
+}: BentoCardModuleProps): React.JSX.Element {
   const { data, isLoading } = useDashboardMetrics('engineer')
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'uptime',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -328,14 +344,14 @@ export function MetricUptimeModule({ config }: BentoCardModuleProps): React.JSX.
 }
 
 export function MetricRequestVolumeModule({
-  config,
+  config: _config,
 }: BentoCardModuleProps): React.JSX.Element {
   const { data, isLoading } = useDashboardMetrics('engineer')
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'request-volume',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -348,14 +364,14 @@ export function MetricRequestVolumeModule({
 // Admin-only KPIs
 
 export function MetricNewSignupsModule({
-  config,
+  config: _config,
 }: BentoCardModuleProps): React.JSX.Element {
   const { data, isLoading } = useDashboardMetrics('admin')
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'new-signups',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (
@@ -366,14 +382,14 @@ export function MetricNewSignupsModule({
 }
 
 export function MetricActiveOrgsModule({
-  config,
+  config: _config,
 }: BentoCardModuleProps): React.JSX.Element {
   const { data, isLoading } = useDashboardMetrics('admin')
   const metric = (data as { kpis?: KpiMetric[] } | undefined)?.kpis?.find(
     (k) => k.id === 'active-orgs',
   )
   return (
-    <ModuleWrapper title={config.title}>
+    <ModuleWrapper>
       {isLoading || !metric ? (
         <MetricSkeleton />
       ) : (

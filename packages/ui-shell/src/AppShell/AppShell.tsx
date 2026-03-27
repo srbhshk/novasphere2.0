@@ -54,7 +54,7 @@ export default function AppShell({
             {...(breadcrumbs ? { breadcrumbs } : {})}
             {...(topbarRightSlot ? { rightSlot: topbarRightSlot } : {})}
           />
-          <main className="relative flex-1 overflow-y-auto p-6">{children}</main>
+          <main className="relative min-h-0 flex-1 overflow-y-auto p-6">{children}</main>
         </div>
       </div>
     </div>

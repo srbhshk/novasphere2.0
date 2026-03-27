@@ -15,10 +15,10 @@ export type AdapterStatusBadgeProps = {
 function getLabel(props: AdapterStatusBadgeProps): string {
   const { adapterType, status, modelName } = props
   if (status === 'checking') return 'Detecting AI engine…'
-  if (adapterType === 'ollama') return `● Local · ${modelName ?? 'Ollama'}`
-  if (adapterType === 'claude') return '● Claude'
-  if (adapterType === 'openai') return '● GPT'
-  if (adapterType === 'mock') return '◌ Demo mode'
+  if (adapterType === 'ollama') return `Local · ${modelName ?? 'Ollama'}`
+  if (adapterType === 'claude') return 'Claude'
+  if (adapterType === 'openai') return 'GPT'
+  if (adapterType === 'mock') return 'Demo mode'
   return '● Unknown'
 }
 

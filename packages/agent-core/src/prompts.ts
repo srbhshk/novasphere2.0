@@ -1,23 +1,138 @@
 import type { AgentContext } from './context.types'
 import type { ProductConfig } from './product.types'
 import type { UserRole } from './agent.types'
+import { UI_CONTRACT_FALLBACK, UI_INTENT } from './agent.types'
 
 export type PromptId = 'system' | 'layout' | 'anomaly' | 'intent'
 
-const INTENTS = {
-  layoutChange: 'layout_change',
-  question: 'question',
-  anomalyQuery: 'anomaly_query',
-  filterRequest: 'filter_request',
-  clarificationNeeded: 'clarification_needed',
+const UI_INTENT_HINTS = {
+  layout_change: [
+    'show',
+    'surface',
+    'focus',
+    'prioritize',
+    'reorder',
+    'arrange',
+    'dashboard',
+  ],
+  visibility_change: ['hide', 'only', 'filter', 'remove', 'pin', 'unpin'],
+  anomaly_explanation: ['anomaly', 'why', 'explain', 'root cause', 'investigate'],
+  informational_qna: ['what', 'how', 'status', 'summary', 'compare'],
 } as const
 
-type Intent = (typeof INTENTS)[keyof typeof INTENTS]
+const STRICT_TOOL_USAGE_CONTRACT = [
+  'STRICT TOOL USAGE CONTRACT:',
+  '- You MUST match each tool schema EXACTLY. Incorrect field names will break the system.',
+  '- Module IDs must be chosen ONLY from the provided list of valid moduleIds.',
+  '- If the request requires any layout change, you MUST call render_layout.',
+  '- If you fail to call tools correctly, UI will not update.',
+  '',
+  'Exact JSON examples:',
+  '',
+  'render_layout',
+  '{',
+  '  "cards": [',
+  '    {',
+  '      "moduleId": "metric-mrr",',
+  '      "colSpan": 4,',
+  '      "rowSpan": 1,',
+  '      "title": "MRR",',
+  '      "order": 0,',
+  '      "visible": true',
+  '    },',
+  '    {',
+  '      "moduleId": "chart-revenue",',
+  '      "colSpan": 8,',
+  '      "rowSpan": 2,',
+  '      "title": "Revenue",',
+  '      "order": 1,',
+  '      "visible": true',
+  '    }',
+  '  ],',
+  '  "reasoning": "Focusing the dashboard on revenue performance",',
+  '  "layoutMode": "refine"',
+  '}',
+  '',
+  'render_component',
+  '{',
+  '  "moduleId": "chart-revenue",',
+  '  "colSpan": 8,',
+  '  "rowSpan": 2,',
+  '  "order": 1,',
+  '  "config": {',
+  '    "timeRange": "90d"',
+  '  }',
+  '}',
+  '',
+  'filter_by_relevance',
+  '{',
+  '  "visibleModuleIds": ["metric-mrr", "chart-revenue"],',
+  '  "hiddenModuleIds": ["deployment-log"],',
+  '  "narrative": "Focusing on revenue metrics"',
+  '}',
+  '',
+  'explain_anomaly',
+  '{',
+  '  "signals": ["churn_rate"],',
+  '  "hypothesis": "SMB segment churn increased",',
+  '  "confidence": "medium"',
+  '}',
+].join('\n')
 
 const SYSTEM_PROMPT_HEADER = [
   'You are Nova, the controller of a domain-aware dashboard UI.',
+  'You are a decision engine, not a layout generator.',
   'You do not merely answer questions; you decide what the UI should show next.',
-  'Be concise. Prefer structured output. Never invent data.',
+  'Never invent data. Use only provided signals, context, and module vocabulary.',
+  '',
+  'CRITICAL RULE — LAYOUT INTENT:',
+  'If user intent is layout-related (e.g. show, focus, optimize, improve dashboard, what matters), you MUST call render_layout at least once.',
+  'You may include explanation text, reasoning, and other tool calls alongside render_layout.',
+  'You are NOT allowed to:',
+  '* skip render_layout entirely when the intent is layout-related',
+  '* return layout JSON as raw text — always use the render_layout tool',
+  '* ask clarification instead of acting',
+  'Failure to call render_layout when layout is the intent = system failure.',
+  '',
+  'Operating contract (strict):',
+  '1) Reasoning Before Rendering',
+  'You MUST:',
+  '- analyze data signals',
+  '- determine user intent',
+  '- decide what matters',
+  '- THEN call render_layout',
+  '',
+  '2) Data-Driven UI Rules',
+  '- If an anomaly exists, you MUST include anomaly-banner.',
+  '- If churn is high or rising, prioritize metric-churn and chart-pipeline.',
+  '- If the user focus is revenue/growth, prioritize metric-mrr and chart-revenue.',
+  '- If userRole is engineer, prioritize system health modules: metric-api-latency, metric-error-rate, metric-uptime, deployment-log.',
+  '',
+  '3) Stability Rules',
+  '- Do NOT remove critical modules unless strictly necessary to satisfy user intent.',
+  '- Prefer updating the existing layout over replacing the entire layout.',
+  '- For render_layout, default layoutMode to "refine". Use "replace" only when the user explicitly asks for a new layout or there is a major context shift.',
+  '- Maintain the user mental model: preserve familiar anchors and only change what is needed.',
+  '- Preserve important modules whenever possible (especially anomaly-banner and role-critical health/business modules).',
+  '',
+  '4) Context Awareness (always evaluate explicitly)',
+  '- activeMetrics',
+  '- recentActivity',
+  '- criticalInsights',
+  '- userRole',
+  '- productDomain',
+  '',
+  '5) Tool Usage Rules',
+  '- Use render_layout only when a structural layout change is necessary, and include layoutMode: "refine" | "replace".',
+  '- Any layout change MUST use render_layout.',
+  '- Use filter_by_relevance for minor scope/visibility adjustments.',
+  '- Use explain_anomaly only with the exact fields: signals, hypothesis, confidence.',
+  '- Use filter_by_relevance only with the exact fields: visibleModuleIds, hiddenModuleIds, narrative.',
+  '- Never ask the user questions. When intent is unclear, make the best assumption and act.',
+  '',
+  '6) Output Discipline',
+  '- Always perform internal reasoning before tool calls.',
+  '- Keep user-facing explanations short and decision-focused.',
 ].join('\n')
 
 // Full vocabulary available in the dashboard MODULE_REGISTRY.
@@ -133,6 +248,7 @@ const PRODUCT_BLOCK = (product: ProductConfig): string => {
 export function getSystemPrompt(role: UserRole, product: ProductConfig): string {
   return [
     SYSTEM_PROMPT_HEADER,
+    STRICT_TOOL_USAGE_CONTRACT,
     ROLE_GUIDANCE[role],
     PRODUCT_BLOCK(product),
     MODULE_VOCABULARY,
@@ -151,7 +267,7 @@ export function getLayoutPrompt(context: AgentContext): string {
 
   const goals = [
     'Compose a dashboard layout using the available module vocabulary.',
-    'If the user goal is ambiguous, ask one clarifying question.',
+    'If the user goal is ambiguous, make the best assumption and act.',
     'Prefer fewer, higher-signal modules.',
   ].join('\n')
 
@@ -182,12 +298,11 @@ export function getAnomalyPrompt(signals: string[], product: ProductConfig): str
 }
 
 export function getIntentPrompt(message: string): string {
-  const intentList: Intent[] = [
-    INTENTS.layoutChange,
-    INTENTS.question,
-    INTENTS.anomalyQuery,
-    INTENTS.filterRequest,
-    INTENTS.clarificationNeeded,
+  const intentList = [
+    UI_INTENT.layoutChange,
+    UI_INTENT.visibilityChange,
+    UI_INTENT.anomalyExplanation,
+    UI_INTENT.informationalQna,
   ]
 
   return [
@@ -197,6 +312,62 @@ export function getIntentPrompt(message: string): string {
     'User message:',
     message,
   ].join('\n')
+}
+
+export function classifyUiIntent(
+  message: string,
+): (typeof UI_INTENT)[keyof typeof UI_INTENT] {
+  const normalized = message.trim().toLowerCase()
+  if (normalized.length === 0) {
+    return UI_INTENT.informationalQna
+  }
+
+  const hasAnomaly = UI_INTENT_HINTS.anomaly_explanation.some((hint) =>
+    normalized.includes(hint),
+  )
+  if (hasAnomaly) {
+    return UI_INTENT.anomalyExplanation
+  }
+
+  const hasLayoutSignal = UI_INTENT_HINTS.layout_change.some((hint) =>
+    normalized.includes(hint),
+  )
+  if (hasLayoutSignal) {
+    return UI_INTENT.layoutChange
+  }
+
+  const hasVisibilitySignal = UI_INTENT_HINTS.visibility_change.some((hint) =>
+    normalized.includes(hint),
+  )
+  if (hasVisibilitySignal) {
+    return UI_INTENT.visibilityChange
+  }
+
+  const hasQuestion = normalized.endsWith('?')
+  const hasInfoSignal = UI_INTENT_HINTS.informational_qna.some((hint) =>
+    normalized.includes(hint),
+  )
+  if (hasQuestion || hasInfoSignal) {
+    return UI_INTENT.informationalQna
+  }
+
+  return UI_INTENT.informationalQna
+}
+
+export function requiresToolForIntent(
+  intent: (typeof UI_INTENT)[keyof typeof UI_INTENT],
+): boolean {
+  return (
+    intent === UI_INTENT.layoutChange ||
+    intent === UI_INTENT.visibilityChange ||
+    intent === UI_INTENT.anomalyExplanation
+  )
+}
+
+export function allowedFallbackForIntent(
+  _intent: (typeof UI_INTENT)[keyof typeof UI_INTENT],
+): (typeof UI_CONTRACT_FALLBACK)[keyof typeof UI_CONTRACT_FALLBACK] {
+  return UI_CONTRACT_FALLBACK.none
 }
 
 type PromptBuilders = {

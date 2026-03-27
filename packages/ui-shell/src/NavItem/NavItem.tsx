@@ -5,7 +5,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@novasphere/ui-glass'
-import { icons } from 'lucide-react'
+import {
+  BarChart3,
+  Bot,
+  Circle,
+  GitBranch,
+  LayoutDashboard,
+  LineChart,
+  Settings,
+  Settings2,
+} from 'lucide-react'
 import * as React from 'react'
 
 import type { TenantNavItem } from '@novasphere/tenant-core'
@@ -35,30 +44,23 @@ function FallbackIcon({
   size?: number
   'aria-hidden'?: boolean | 'true' | 'false'
 }): React.JSX.Element {
-  return (
-    <svg
-      {...rest}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      width={size}
-      height={size}
-    >
-      <circle cx="12" cy="12" r="7" />
-    </svg>
-  )
+  return <Circle {...rest} className={className} size={size} />
 }
 
 function getIconByName(iconName: string): IconComponentType {
-  const possibleIcon = (icons as unknown as Record<string, unknown>)[iconName]
+  const name = iconName.trim()
 
-  if (typeof possibleIcon === 'function') {
-    return possibleIcon as IconComponentType
+  const iconMap: Record<string, IconComponentType> = {
+    LayoutDashboard,
+    LineChart,
+    BarChart3,
+    GitBranch,
+    Bot,
+    Settings,
+    Settings2,
   }
 
-  return FallbackIcon
+  return iconMap[name] ?? FallbackIcon
 }
 
 export default function NavItem({

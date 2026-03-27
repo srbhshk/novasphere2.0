@@ -1,4 +1,10 @@
-import type { TenantPlan, UserPreferences, UserRole } from './agent.types'
+import type {
+  TenantPlan,
+  UiActionContractDecision,
+  UiActionContractResult,
+  UserPreferences,
+  UserRole,
+} from './agent.types'
 import type { ActivityEvent, MetricSnapshot } from './agent.types'
 
 export type BentoCardConfig = {
@@ -27,7 +33,10 @@ export type AgentContext = {
   visibleCards: BentoCardConfig[]
   activeMetrics: MetricSnapshot[]
   recentActivity: ActivityEvent[]
+  criticalInsights?: string[]
   userMessage: string
   conversationHistory: string
   userPreferences: UserPreferences
+  uiContract?: UiActionContractDecision
+  uiContractResult?: UiActionContractResult
 }

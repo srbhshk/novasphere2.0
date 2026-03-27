@@ -24,15 +24,30 @@ vi.mock('@novasphere/ui-glass', async () => {
   }
 })
 
-// Recharts relies on ResizeObserver which jsdom does not implement by default.
+// Recharts and ChartResponsiveContainer rely on ResizeObserver; jsdom has no native impl.
+// Fire a callback with sane defaults when layout size is still 0×0 in tests.
 class ResizeObserverMock {
   callback: ResizeObserverCallback
   constructor(callback: ResizeObserverCallback) {
     this.callback = callback
   }
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe(target: Element): void {
+    queueMicrotask(() => {
+      const rect = target.getBoundingClientRect()
+      const w = rect.width > 0 ? rect.width : 400
+      const h = rect.height > 0 ? rect.height : 300
+      const entry = {
+        target,
+        contentRect: new DOMRect(0, 0, w, h),
+        borderBoxSize: [],
+        contentBoxSize: [],
+        devicePixelContentBoxSize: [],
+      } as ResizeObserverEntry
+      this.callback([entry], this as unknown as ResizeObserver)
+    })
+  }
+  unobserve(): void {}
+  disconnect(): void {}
 }
 
 const globalWithResizeObserver = globalThis as typeof globalThis & {

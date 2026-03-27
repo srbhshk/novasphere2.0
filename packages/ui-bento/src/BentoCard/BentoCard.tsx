@@ -51,7 +51,7 @@ export const BentoCard = memo(function BentoCard({
           </button>
         ) : null}
       </div>
-      <div className="flex-1">{children}</div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</div>
     </GlassCard>
   )
 })

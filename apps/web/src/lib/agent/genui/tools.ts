@@ -1,141 +1,182 @@
 import type { ToolSet } from 'ai'
 import { z } from 'zod'
+import type { MODULE_REGISTRY } from '@/app/(dashboard)/[tenant]/dashboard/modules/registry'
 
-const componentCardSchema = z.object({
-  moduleId: z.string(),
-  colSpan: z.number().int().min(3).max(12),
-  rowSpan: z.number().int().min(1).max(3),
-  title: z.string().optional(),
-  order: z.number().int(),
-  visible: z.boolean(),
-  config: z.record(z.string(), z.unknown()).optional(),
-})
+export const VALID_MODULE_IDS = [
+  'metric-mrr',
+  'metric-arr',
+  'metric-nrr',
+  'metric-churn',
+  'metric-arpu',
+  'metric-ltv',
+  'metric-conversion',
+  'metric-users',
+  'metric-new-signups',
+  'metric-active-orgs',
+  'metric-api-latency',
+  'metric-error-rate',
+  'metric-uptime',
+  'metric-request-volume',
+  'chart-revenue',
+  'chart-revenue-comparison',
+  'chart-churn-trend',
+  'chart-user-growth',
+  'chart-top-customers',
+  'chart-pipeline',
+  'chart-plan-distribution',
+  'chart-feature-adoption',
+  'chart-response-time',
+  'chart-error-breakdown',
+  'chart-activity',
+  'chart-sparkline',
+  'customer-table',
+  'pipeline-table',
+  'activity-feed',
+  'deployment-log',
+  'system-alerts',
+  'anomaly-banner',
+] as const satisfies readonly (keyof typeof MODULE_REGISTRY)[]
 
-export const renderLayoutSchema = z.preprocess(
-  (input) => {
-    if (typeof input !== 'object' || input == null) {
-      return input
-    }
-    const value = input as Record<string, unknown>
+const moduleIdSchema = z.enum(VALID_MODULE_IDS)
+const confidenceSchema = z.enum(['high', 'medium', 'low'])
 
-    if (Array.isArray(value['cards'])) {
-      return {
-        cards: value['cards'],
-        reasoning: typeof value['reasoning'] === 'string' ? value['reasoning'] : '',
+function formatSchemaError(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join('.') : 'input'
+      return `${path}: ${issue.message}`
+    })
+    .join('; ')
+}
+
+function parseToolInputOrThrow<TSchema extends z.ZodTypeAny>(
+  toolName: string,
+  schema: TSchema,
+  input: unknown,
+): z.infer<TSchema> {
+  const parsed = schema.safeParse(input)
+  if (parsed.success) {
+    return parsed.data
+  }
+
+  throw new Error(`Invalid ${toolName} input. ${formatSchemaError(parsed.error)}`)
+}
+
+function createUniqueModuleIdArraySchema(fieldName: string) {
+  return z.array(moduleIdSchema).superRefine((moduleIds, ctx) => {
+    const seen = new Set<string>()
+    for (const moduleId of moduleIds) {
+      if (seen.has(moduleId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate moduleId "${moduleId}" is not allowed in ${fieldName}.`,
+        })
+        return
       }
+      seen.add(moduleId)
     }
+  })
+}
 
-    if (Array.isArray(value['board_modules'])) {
-      return {
-        cards: value['board_modules'],
-        reasoning: typeof value['reasoning'] === 'string' ? value['reasoning'] : '',
-      }
-    }
+const componentCardSchema = z
+  .object({
+    moduleId: moduleIdSchema,
+    colSpan: z.number().int().min(3).max(12),
+    rowSpan: z.number().int().min(1).max(3),
+    title: z.string().optional(),
+    order: z.number().int(),
+    visible: z.boolean(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
 
-    if (
-      typeof value['moduleId'] === 'string' &&
-      typeof value['colSpan'] === 'number' &&
-      typeof value['rowSpan'] === 'number' &&
-      typeof value['order'] === 'number'
-    ) {
-      return {
-        cards: [
-          {
-            moduleId: value['moduleId'],
-            colSpan: value['colSpan'],
-            rowSpan: value['rowSpan'],
-            order: value['order'],
-            visible: typeof value['visible'] === 'boolean' ? value['visible'] : true,
-            ...(typeof value['title'] === 'string' ? { title: value['title'] } : {}),
-            ...(typeof value['config'] === 'object' && value['config'] !== null
-              ? { config: value['config'] }
-              : {}),
-          },
-        ],
-        reasoning: typeof value['reasoning'] === 'string' ? value['reasoning'] : '',
-      }
-    }
-
-    return input
-  },
-  z.object({
+export const renderLayoutSchema = z
+  .object({
     cards: z.array(componentCardSchema),
     reasoning: z.string().optional(),
-  }),
-)
+    layoutMode: z.enum(['replace', 'refine']).optional(),
+  })
+  .strict()
 
-export const renderComponentSchema = z.object({
-  moduleId: z.string(),
-  colSpan: z.number(),
-  rowSpan: z.number(),
-  order: z.number(),
-  config: z.record(z.string(), z.unknown()).optional(),
-})
+export const renderComponentSchema = z
+  .object({
+    moduleId: moduleIdSchema,
+    colSpan: z.number().int().min(3).max(12),
+    rowSpan: z.number().int().min(1).max(3),
+    order: z.number().int(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
 
-export const askClarificationSchema = z.preprocess(
-  (input) => {
-    if (typeof input !== 'object' || input == null) {
-      return input
-    }
-    const value = input as Record<string, unknown>
-
-    if (!Array.isArray(value['options']) && Array.isArray(value['question_options'])) {
-      return {
-        question:
-          typeof value['question'] === 'string'
-            ? value['question']
-            : 'What are you optimizing for right now?',
-        options: value['question_options'],
-      }
-    }
-
-    return input
-  },
-  z.object({
+export const askClarificationSchema = z
+  .object({
     question: z.string(),
     options: z.array(z.string()).min(2).max(5),
-  }),
-)
+  })
+  .strict()
 
-export const explainAnomalySchema = z.object({
-  signals: z.array(z.string()),
-  hypothesis: z.string(),
-  confidence: z.enum(['high', 'medium', 'low']),
-  action: z.string().optional(),
-})
+export const explainAnomalySchema = z
+  .object({
+    signals: z.array(z.string().min(1)).min(1),
+    hypothesis: z.string().min(1),
+    confidence: confidenceSchema,
+  })
+  .strict()
 
-export const filterByRelevanceSchema = z.object({
-  visibleModuleIds: z.array(z.string()),
-  hiddenModuleIds: z.array(z.string()),
-  narrative: z.string(),
-})
+export const filterByRelevanceSchema = z
+  .object({
+    visibleModuleIds: createUniqueModuleIdArraySchema('visibleModuleIds'),
+    hiddenModuleIds: createUniqueModuleIdArraySchema('hiddenModuleIds'),
+    narrative: z.string().min(1),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const hiddenModuleIdSet = new Set(value.hiddenModuleIds)
+    const overlappingModuleIds = value.visibleModuleIds.filter((moduleId) =>
+      hiddenModuleIdSet.has(moduleId),
+    )
 
-export const genUiTools: ToolSet = {
+    if (overlappingModuleIds.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['hiddenModuleIds'],
+        message: `Module ids cannot be both visible and hidden: ${overlappingModuleIds.join(', ')}.`,
+      })
+    }
+  })
+
+export const genUiTools = {
   render_layout: {
     description: 'Compose the dashboard layout from available modules',
     inputSchema: renderLayoutSchema,
-    execute: async (input) => input,
+    execute: async (input) =>
+      parseToolInputOrThrow('render_layout', renderLayoutSchema, input),
   },
   render_component: {
     description: 'Update a single module in the current layout',
     inputSchema: renderComponentSchema,
-    execute: async (input) => input,
-  },
-  ask_clarification: {
-    description: 'Ask the user a clarifying question before acting',
-    inputSchema: askClarificationSchema,
-    execute: async (input) => input,
+    execute: async (input) =>
+      parseToolInputOrThrow('render_component', renderComponentSchema, input),
   },
   explain_anomaly: {
     description: 'Provide cross-signal reasoning about an anomaly',
     inputSchema: explainAnomalySchema,
-    execute: async (input) => input,
+    execute: async (input) =>
+      parseToolInputOrThrow('explain_anomaly', explainAnomalySchema, input),
   },
   filter_by_relevance: {
     description: 'Show or hide modules based on user goal',
     inputSchema: filterByRelevanceSchema,
-    execute: async (input) => input,
+    execute: async (input) =>
+      parseToolInputOrThrow('filter_by_relevance', filterByRelevanceSchema, input),
   },
-}
+} satisfies ToolSet
 
 export type GenUiToolName = keyof typeof genUiTools
+
+export const toolInputSchemas = {
+  render_layout: renderLayoutSchema,
+  render_component: renderComponentSchema,
+  explain_anomaly: explainAnomalySchema,
+  filter_by_relevance: filterByRelevanceSchema,
+} as const

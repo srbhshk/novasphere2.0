@@ -3,6 +3,7 @@
 import type React from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { betterAuthAdapter } from '@/lib/auth/better-auth-adapter'
 
 const LoginForm = dynamic(
@@ -12,13 +13,16 @@ const LoginForm = dynamic(
 
 export default function SignInView(): React.JSX.Element {
   const router = useRouter()
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   return (
     <LoginForm
       adapter={betterAuthAdapter}
       className="p-5 sm:p-6"
+      loading={isRedirecting}
       onSuccess={() => {
-        router.push('/demo/dashboard')
+        setIsRedirecting(true)
+        router.replace('/demo/dashboard')
       }}
     />
   )

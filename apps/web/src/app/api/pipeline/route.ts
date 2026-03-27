@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getCeoPipelineDeals } from '@/mocks/ceo.mock'
+import { getCeoPipelineDeals, getPipelineStageAggregates } from '@/mocks/ceo.mock'
 
 const querySchema = z.object({
   stage: z
@@ -8,12 +8,20 @@ const querySchema = z.object({
     .default('all'),
 })
 
-export async function GET(request: Request): Promise<NextResponse> {
-  const role = request.headers.get('x-user-role')
-
-  if (role !== 'ceo' && role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden: insufficient role' }, { status: 403 })
+function resolveRole(header: string | null): 'admin' | 'ceo' | 'engineer' | 'viewer' {
+  if (
+    header === 'admin' ||
+    header === 'ceo' ||
+    header === 'engineer' ||
+    header === 'viewer'
+  ) {
+    return header
   }
+  return 'viewer'
+}
+
+export async function GET(request: Request): Promise<NextResponse> {
+  const role = resolveRole(request.headers.get('x-user-role'))
 
   const url = new URL(request.url)
   const params = querySchema.safeParse({
@@ -27,8 +35,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     )
   }
 
-  const result = getCeoPipelineDeals(
-    params.data.stage === 'all' ? undefined : params.data.stage,
-  )
-  return NextResponse.json(result)
+  const stage = params.data.stage === 'all' ? undefined : params.data.stage
+
+  if (role === 'ceo' || role === 'admin') {
+    const result = getCeoPipelineDeals(stage)
+    return NextResponse.json({ ...result, scope: 'full' })
+  }
+
+  if (role === 'engineer') {
+    const result = getPipelineStageAggregates(stage)
+    return NextResponse.json({ ...result, scope: 'aggregates' })
+  }
+
+  // viewer: no pipeline rows for this role (access-scoped empty result, not an error)
+  return NextResponse.json({
+    items: [],
+    total: 0,
+    page: 1,
+    limit: 0,
+    hasMore: false,
+    scope: 'none',
+  })
 }

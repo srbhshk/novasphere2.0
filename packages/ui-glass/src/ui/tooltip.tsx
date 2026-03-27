@@ -1,22 +1,16 @@
 'use client'
 
 import * as React from 'react'
+import * as RadixTooltip from '@radix-ui/react-tooltip'
 
 import { cn } from '../lib/utils'
-
-type TooltipContextValue = {
-  open: boolean
-  setOpen: (nextOpen: boolean) => void
-}
-
-const TooltipContext = React.createContext<TooltipContextValue | null>(null)
 
 export function TooltipProvider({
   children,
 }: {
   children: React.ReactNode
 }): React.JSX.Element {
-  return <>{children}</>
+  return <RadixTooltip.Provider>{children}</RadixTooltip.Provider>
 }
 
 export function Tooltip({
@@ -24,76 +18,48 @@ export function Tooltip({
 }: {
   children: React.ReactNode
 }): React.JSX.Element {
-  const [open, setOpen] = React.useState(false)
-
-  return (
-    <TooltipContext.Provider value={{ open, setOpen }}>
-      <span className="relative inline-flex">{children}</span>
-    </TooltipContext.Provider>
-  )
+  return <RadixTooltip.Root>{children}</RadixTooltip.Root>
 }
 
-export type TooltipTriggerProps = React.HTMLAttributes<HTMLElement> & {
-  asChild?: boolean
-}
+export type TooltipTriggerProps = React.ComponentPropsWithoutRef<
+  typeof RadixTooltip.Trigger
+>
 
 export function TooltipTrigger({
-  asChild,
   children,
   ...props
 }: TooltipTriggerProps): React.JSX.Element {
-  const context = React.useContext(TooltipContext)
-  if (!context) {
-    return <>{children}</>
-  }
-
-  const triggerProps = {
-    onMouseEnter: () => context.setOpen(true),
-    onMouseLeave: () => context.setOpen(false),
-    onFocus: () => context.setOpen(true),
-    onBlur: () => context.setOpen(false),
-    ...props,
-  }
-
-  if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(
-      children as React.ReactElement<Record<string, unknown>>,
-      triggerProps,
-    )
-  }
-
-  return (
-    <span {...triggerProps} role="button" tabIndex={0}>
-      {children}
-    </span>
-  )
+  return <RadixTooltip.Trigger {...props}>{children}</RadixTooltip.Trigger>
 }
 
-export type TooltipContentProps = React.HTMLAttributes<HTMLDivElement> & {
+export type TooltipContentProps = React.ComponentPropsWithoutRef<
+  typeof RadixTooltip.Content
+> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
 }
 
 export function TooltipContent({
   className,
   children,
+  side = 'top',
   ...props
 }: TooltipContentProps): React.JSX.Element | null {
-  const context = React.useContext(TooltipContext)
-  if (!context || !context.open) {
-    return null
-  }
-
   return (
-    <div
-      className={cn(
-        'absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-md border px-2 py-1 text-xs',
-        'bg-[color:var(--ns-glass-bg-strong)] text-[color:var(--ns-color-text)] border-[color:var(--ns-color-border)]',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </div>
+    <RadixTooltip.Portal>
+      <RadixTooltip.Content
+        side={side}
+        sideOffset={8}
+        className={cn(
+          'z-50 rounded-md border px-2 py-1 text-xs shadow-lg',
+          'bg-[color:var(--ns-glass-bg-strong)] text-[color:var(--ns-color-text)] border-[color:var(--ns-color-border)]',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        <RadixTooltip.Arrow className="fill-[color:var(--ns-glass-bg-strong)]" />
+      </RadixTooltip.Content>
+    </RadixTooltip.Portal>
   )
 }
 

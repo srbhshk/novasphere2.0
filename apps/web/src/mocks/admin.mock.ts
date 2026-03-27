@@ -109,6 +109,25 @@ export function getAdminActivity(
   }
 }
 
+/** Viewer-safe subset: informational and high-level product events only (no admin-only audit). */
+export function getViewerActivity(
+  page: number,
+  limit: number,
+): PaginatedResponse<ActivityEvent> {
+  const safe = ALL_ADMIN_ACTIVITY.filter(
+    (e) => e.severity === 'info' && (e.type === 'signup' || e.type === 'plan_upgrade'),
+  )
+  const total = safe.length
+  const start = (page - 1) * limit
+  return {
+    items: safe.slice(start, start + limit),
+    total,
+    page,
+    limit,
+    hasMore: start + limit < total,
+  }
+}
+
 export const ADMIN_METRICS: AdminMetricsResponse = {
   kpis: [
     {

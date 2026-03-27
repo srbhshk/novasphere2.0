@@ -20,7 +20,7 @@ services:
       # server.js switches cwd to /app/apps/web, so DATABASE_URL must be absolute
       DATABASE_URL: 'file:/app/data/app.db'
       OLLAMA_BASE_URL: 'http://ollama:11434'
-      OLLAMA_MODEL: 'qwen2.5:0.5b'
+      OLLAMA_MODEL: 'qwen2.5:7b-instruct'
       BETTER_AUTH_SECRET: 'change-me-in-production-min-32-chars'
       BETTER_AUTH_URL: 'http://localhost:3000'
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
@@ -50,8 +50,8 @@ services:
         SERVE_PID=$$! &&
         echo '[novasphere] Waiting for Ollama to start...' &&
         sleep 8 &&
-        echo '[novasphere] Pulling qwen2.5:0.5b (~400MB on first run)...' &&
-        ollama pull qwen2.5:0.5b &&
+        echo '[novasphere] Pulling qwen2.5:7b-instruct (~4.5GB on first run)...' &&
+        ollama pull qwen2.5:7b-instruct &&
         echo '[novasphere] Model ready.' &&
         wait $$SERVE_PID
       "

@@ -1,4 +1,4 @@
-export { db, getDb } from './client'
+export { db, getDb, resolveDatabaseUrl } from './client'
 export type { Database } from './client'
 export * from './schema'
 export * from './types'

@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:push": "pnpm --filter @novasphere/db db:push",
-    "db:seed": "pnpm --filter @novasphere/db db:seed",
+    "db:seed": "pnpm --filter web seed:demo",
     "db:studio": "pnpm --filter @novasphere/db db:studio",
     "docker:demo": "docker compose up",
     "docker:build": "docker compose build",

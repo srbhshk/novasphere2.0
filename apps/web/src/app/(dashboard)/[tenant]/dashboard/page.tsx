@@ -9,7 +9,7 @@ import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
 import type { GenUiToolName } from '@/lib/agent/genui/tools'
-import { extractToolCalls } from '@/lib/agent/genui/tool-parser'
+import { extractToolCallsForExecution } from '@/lib/agent/genui/tool-parser'
 import { MODULE_REGISTRY } from './modules/registry'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
@@ -394,8 +394,7 @@ export default function DashboardPage(): React.JSX.Element {
   const setAdapterStatus = useAgentPanelStore((s) => s.setAdapterStatus)
   const suggestions = useAgentPanelStore((s) => s.suggestions)
   const processedToolRef = useRef<Set<string>>(new Set())
-  const anomalyExplainedRef = useRef<boolean>(false)
-  const initialLayoutRequestedRef = useRef<boolean>(false)
+  const initialBootstrapSentRef = useRef<boolean>(false)
   const toolRetryCountRef = useRef<number>(0)
 
   const { messages, sendMessage, status } = useCopilotChat()
@@ -432,40 +431,35 @@ export default function DashboardPage(): React.JSX.Element {
     }
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
 
-  // Auto-explain anomaly once on load
+  // Single bootstrap turn: anomaly + initial layout in one request when data shows an anomaly,
+  // otherwise layout-only. Avoids racing two effects on `messages.length`.
   useEffect(() => {
-    if (!hasResolvedSession) return
-    if (anomalyExplainedRef.current) return
-    if (metricsPending || anomalyMetric == null || isGenerating) return
-    if (status === 'streaming' || status === 'submitted') return
-    anomalyExplainedRef.current = true
-    sendMessage({
-      text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}`,
-    })
-  }, [
-    hasResolvedSession,
-    metricsPending,
-    anomalyMetric,
-    isGenerating,
-    status,
-    sendMessage,
-  ])
-
-  // Compose initial layout from the AI on first load via the chat transport only.
-  // This keeps /api/agent on a single request schema (messages).
-  useEffect(() => {
-    if (isPending) return
-    if (!hasResolvedSession) return
+    if (isPending || !hasResolvedSession) return
+    if (metricsPending) return
     if (status === 'submitted' || status === 'streaming') return
-    if (initialLayoutRequestedRef.current) return
-    if (messages.length > 0) return
+    if (initialBootstrapSentRef.current) return
 
-    initialLayoutRequestedRef.current = true
+    initialBootstrapSentRef.current = true
     setGenerating(true)
-    sendMessage({
-      text: 'Compose the initial dashboard layout for this user.',
-    })
-  }, [hasResolvedSession, isPending, messages.length, sendMessage, setGenerating, status])
+    if (anomalyMetric != null) {
+      sendMessage({
+        text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}. Then compose the initial dashboard layout for this user (role: ${agentRole}) using the render_layout tool with role-appropriate modules.`,
+      })
+    } else {
+      sendMessage({
+        text: 'Compose the initial dashboard layout for this user.',
+      })
+    }
+  }, [
+    agentRole,
+    anomalyMetric,
+    hasResolvedSession,
+    isPending,
+    metricsPending,
+    sendMessage,
+    setGenerating,
+    status,
+  ])
 
   useEffect(() => {
     if (status === 'ready') {
@@ -498,7 +492,7 @@ export default function DashboardPage(): React.JSX.Element {
       const m = msg as unknown as Record<string, unknown>
       const id = m['id'] as string | undefined
       if (!id) continue
-      const toolCalls = extractToolCalls(m)
+      const toolCalls = extractToolCallsForExecution(m)
       for (const { toolCallId, toolName, args } of toolCalls) {
         const key = `${id}-${toolCallId}-${toolName}`
         if (processedToolRef.current.has(key)) continue
@@ -584,7 +578,7 @@ export default function DashboardPage(): React.JSX.Element {
     const assistantRecord = lastAssistant as unknown as Record<string, unknown>
     // Safety: both messages are object-like records after array/role guards.
     const userRecord = lastUser as unknown as Record<string, unknown>
-    const assistantToolCalls = extractToolCalls(assistantRecord)
+    const assistantToolCalls = extractToolCallsForExecution(assistantRecord)
     if (assistantToolCalls.length > 0) return
 
     const userParts = userRecord['parts']

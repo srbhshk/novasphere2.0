@@ -47,10 +47,30 @@ export default function CopilotDock(): React.JSX.Element {
   const downloadProgress = useAgentPanelStore((s) => s.downloadProgress)
   const setOpen = useAgentPanelStore((s) => s.setOpen)
 
-  const { messages, sendMessage, status } = useCopilotChat()
+  const { messages, sendMessage, status, stop } = useCopilotChat()
 
   const chatBusy = status === 'streaming' || status === 'submitted'
   const isLoading = chatBusy
+
+  const pendingSendRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (status !== 'ready' || pendingSendRef.current == null) return
+    const text = pendingSendRef.current
+    pendingSendRef.current = null
+    sendMessage({ text })
+  }, [sendMessage, status])
+
+  const queueOrSend = React.useCallback(
+    (text: string) => {
+      if (status === 'ready') {
+        sendMessage({ text })
+        return
+      }
+      pendingSendRef.current = text
+    },
+    [sendMessage, status],
+  )
 
   const normalizedMessages = React.useMemo(() => {
     return messages.map((m) => {
@@ -131,6 +151,9 @@ export default function CopilotDock(): React.JSX.Element {
         <CopilotPanelNoSsr
           messages={normalizedMessages}
           isLoading={isLoading}
+          lockInputWhileBusy={false}
+          allowSendWhileBusy
+          onStop={stop}
           {...(streamingContent != null ? { streamingContent } : {})}
           suggestions={suggestions}
           adapterType={adapterType ?? 'ollama'}
@@ -143,11 +166,9 @@ export default function CopilotDock(): React.JSX.Element {
                 : adapterStatus
           }
           downloadProgress={downloadProgress}
-          onSend={(text: string) => {
-            sendMessage({ text })
-          }}
+          onSend={queueOrSend}
           onSuggestionSelect={(chip: SuggestionChip) => {
-            sendMessage({ text: chip.action })
+            queueOrSend(chip.action)
             setSuggestions([])
           }}
           isOpen={isOpen}

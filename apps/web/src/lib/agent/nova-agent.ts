@@ -7,9 +7,10 @@ import {
   getSystemPrompt,
 } from '@novasphere/agent-core'
 import { z } from 'zod'
+import { env } from '@/lib/env'
 import { getActiveModel } from './models'
 import { genUiTools } from './genui/tools'
-import { writeAgentLog } from './observability'
+import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
 import { novaConfig } from 'nova.config'
 
 export const callOptionsSchema = z.object({
@@ -32,6 +33,8 @@ type AgentStreamInput =
       options: AgentContext
       forceRenderLayout?: boolean
       forceRenderLayoutRetry?: boolean
+      abortSignal?: AbortSignal
+      turnTimeoutMs?: number
     }
   | {
       prompt?: never
@@ -39,6 +42,8 @@ type AgentStreamInput =
       options: AgentContext
       forceRenderLayout?: boolean
       forceRenderLayoutRetry?: boolean
+      abortSignal?: AbortSignal
+      turnTimeoutMs?: number
     }
 
 export function detectLayoutIntent(message: string): boolean {
@@ -199,8 +204,12 @@ class NovaToolLoopAgent {
     })
 
     const model = await getActiveModel()
+    const turnTimeoutMs = input.turnTimeoutMs ?? env.AGENT_TURN_TIMEOUT_MS
     const forceRenderLayout =
       input.forceRenderLayout === true || detectLayoutIntent(input.options.userMessage)
+    const layoutHeavy =
+      forceRenderLayout || input.options.uiContract?.requiresTool === true
+    const maxSteps = layoutHeavy ? 5 : 3
     const system = buildSystemInstructions(
       {
         ...input.options,
@@ -214,7 +223,7 @@ class NovaToolLoopAgent {
       },
     )
 
-    writeAgentLog({
+    writeAgentLogWithFileSink({
       event: 'agent_turn_start',
       intent: input.options.uiContract?.intent ?? 'informational_qna',
       requiresTool: input.options.uiContract?.requiresTool === true,
@@ -229,7 +238,9 @@ class NovaToolLoopAgent {
         system,
         messages: input.messages,
         tools: genUiTools,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(maxSteps),
+        ...(input.abortSignal != null ? { abortSignal: input.abortSignal } : {}),
+        timeout: turnTimeoutMs,
       })
     }
 
@@ -238,7 +249,9 @@ class NovaToolLoopAgent {
       system,
       prompt: input.prompt ?? '',
       tools: genUiTools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(maxSteps),
+      ...(input.abortSignal != null ? { abortSignal: input.abortSignal } : {}),
+      timeout: turnTimeoutMs,
     })
   }
 

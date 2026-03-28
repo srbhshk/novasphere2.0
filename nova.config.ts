@@ -64,8 +64,10 @@ export const novaConfig = {
     // Display name of the AI copilot
     name: 'Nova',
     avatarEmoji: '◆',
-    // Default local model — runs offline via Ollama
-    ollamaModel: 'qwen2.5:7b-instruct',
+    // Documented quality default — override with OLLAMA_MODEL env (see .env.example).
+    ollamaModel: 'qwen2.5:0.5b',
+    /** Used when `AI_LATENCY_PROFILE=responsive` (overridden by `OLLAMA_MODEL_FAST` env). */
+    ollamaModelFast: 'qwen2.5:3b-instruct',
     // Show which AI engine is running in the CopilotPanel
     showAdapterStatus: true,
   },

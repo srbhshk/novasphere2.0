@@ -2,7 +2,8 @@ import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 
 import { env } from '@/lib/env'
-import { writeAgentLog } from './observability'
+import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
+import { novaConfig } from 'nova.config'
 
 export { DEFAULT_OLLAMA_MODEL, FALLBACK_OLLAMA_MODEL } from '@/lib/agent/ollama-defaults'
 
@@ -29,7 +30,7 @@ function warnIfModelTooSmallForGenUi(modelId: string): void {
   const billions = extractLargestParameterBillions(modelId)
   if (billions === undefined || billions >= 3) return
   warnedSmallModel = true
-  writeAgentLog({
+  writeAgentLogWithFileSink({
     level: 'warn',
     event: 'ollama_model_small',
     message: 'Model too small for GenUI — expect degraded behavior',
@@ -37,9 +38,20 @@ function warnIfModelTooSmallForGenUi(modelId: string): void {
   })
 }
 
+function resolveOllamaModelId(): string {
+  if (env.AI_LATENCY_PROFILE === 'responsive') {
+    const fromEnv = env.OLLAMA_MODEL_FAST
+    if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+      return fromEnv
+    }
+    return novaConfig.agent.ollamaModelFast
+  }
+  return env.OLLAMA_MODEL
+}
+
 export function createOllamaModel(): LanguageModel {
   const baseURL = `${env.OLLAMA_BASE_URL}/v1`
-  const modelName = env.OLLAMA_MODEL
+  const modelName = resolveOllamaModelId()
 
   warnIfModelTooSmallForGenUi(modelName)
 

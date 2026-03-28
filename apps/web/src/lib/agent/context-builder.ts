@@ -16,7 +16,7 @@ import {
 } from '@novasphere/agent-core'
 import { z } from 'zod'
 import { novaConfig } from 'nova.config'
-import { writeAgentLog } from './observability'
+import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
 
 type BuildAgentContextInput = {
   headers: Headers
@@ -28,6 +28,10 @@ type BuildAgentContextInput = {
 const ROLE_FALLBACK: UserRole = 'viewer'
 const TENANT_PLAN_FALLBACK: TenantPlan = 'free'
 const ACTIVITY_LIMIT = 10
+
+function elapsedMs(startMs: number): number {
+  return Date.now() - startMs
+}
 
 const kpiMetricSchema = z.object({
   id: z.string(),
@@ -266,7 +270,9 @@ async function fetchJson(
   origin: string,
   path: string,
   identity: CanonicalIdentity,
+  turnId: string,
 ): Promise<unknown | null> {
+  const fetchStartMs = Date.now()
   try {
     const response = await fetch(`${origin}${path}`, {
       method: 'GET',
@@ -278,7 +284,7 @@ async function fetchJson(
       cache: 'no-store',
     })
     if (!response.ok) {
-      writeAgentLog({
+      writeAgentLogWithFileSink({
         event: 'agent_context_endpoint_degraded',
         path,
         status: response.status,
@@ -287,8 +293,25 @@ async function fetchJson(
       })
       return null
     }
-    return (await response.json()) as unknown
+    const payload = (await response.json()) as unknown
+    writeAgentLogWithFileSink({
+      event: 'agent_timing_context_http_ok',
+      turnId,
+      path,
+      elapsedMs: elapsedMs(fetchStartMs),
+      role: identity.userRole,
+      tenantId: identity.tenantId,
+    })
+    return payload
   } catch {
+    writeAgentLogWithFileSink({
+      event: 'agent_timing_context_http_failed',
+      turnId,
+      path,
+      elapsedMs: elapsedMs(fetchStartMs),
+      role: identity.userRole,
+      tenantId: identity.tenantId,
+    })
     return null
   }
 }
@@ -366,14 +389,15 @@ function deriveCriticalInsights(
 async function resolveDashboardData(
   headers: Headers,
   identity: CanonicalIdentity,
+  turnId: string,
 ): Promise<DashboardData> {
   const origin = readOrigin(headers)
 
   const [metricsRaw, pipelineRaw, activityRaw, systemHealthRaw] = await Promise.all([
-    fetchJson(origin, '/api/metrics', identity),
-    fetchJson(origin, '/api/pipeline?stage=all', identity),
-    fetchJson(origin, `/api/activity?page=1&limit=${ACTIVITY_LIMIT}`, identity),
-    fetchJson(origin, '/api/system-health', identity),
+    fetchJson(origin, '/api/metrics', identity, turnId),
+    fetchJson(origin, '/api/pipeline?stage=all', identity, turnId),
+    fetchJson(origin, `/api/activity?page=1&limit=${ACTIVITY_LIMIT}`, identity, turnId),
+    fetchJson(origin, '/api/system-health', identity, turnId),
   ])
 
   const parsedMetrics = metricsResponseSchema.safeParse(metricsRaw)
@@ -432,7 +456,9 @@ async function resolveDashboardData(
 export async function buildAgentContext(
   input: BuildAgentContextInput,
 ): Promise<AgentContext> {
+  const contextStartMs = Date.now()
   const { headers, userMessage, conversationHistory, currentRoute } = input
+  const turnId = headers.get('x-turn-id') ?? 'unknown'
 
   const tenantId = readTenantId(headers)
   const identity = buildCanonicalIdentity(headers)
@@ -450,8 +476,19 @@ export async function buildAgentContext(
     resolveTenantPlan(tenantId),
     resolvePermissions(tenantId, userId),
     resolvePreferences(tenantId, userId, userRole),
-    resolveDashboardData(headers, identity),
+    resolveDashboardData(headers, identity, turnId),
   ])
+
+  writeAgentLogWithFileSink({
+    event: 'agent_timing_context_ready',
+    turnId,
+    elapsedMs: elapsedMs(contextStartMs),
+    userRole,
+    tenantId,
+    contextDegraded: dashboardData.contextDegraded,
+    metricsCount: dashboardData.activeMetrics.length,
+    activityCount: dashboardData.recentActivity.length,
+  })
 
   return {
     tenantId,

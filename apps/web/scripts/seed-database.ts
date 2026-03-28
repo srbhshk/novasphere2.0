@@ -1,22 +1,21 @@
 /**
- * Demo seed script.
- * Run with: pnpm --filter @novasphere/db db:seed
- * Creates repeatable demo data. Safe to run multiple times (upserts).
+ * Demo database seed (Better Auth lives in apps/web only per monorepo rules).
+ * Run: pnpm --filter web seed:demo
+ * Requires DATABASE_URL=file:... or libsql:...
  */
 
 import { hashPassword } from 'better-auth/crypto'
-import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import { sql } from 'drizzle-orm'
-import { db, resolveDatabaseUrl } from './client'
-import type * as schema from './schema'
 import {
   accounts,
+  db,
   members,
   organizations,
+  resolveDatabaseUrl,
   tenantConfigs,
   userPreferences,
   users,
-} from './schema'
+} from '@novasphere/db'
 
 const now = new Date()
 
@@ -24,14 +23,12 @@ async function seed(): Promise<void> {
   const url = resolveDatabaseUrl()
   if (!url.startsWith('file:') && !url.startsWith('libsql:')) {
     throw new Error(
-      '[novasphere/db] Seed only supports SQLite or libsql. Use a file: or libsql: DATABASE_URL.',
+      '[novasphere/web] Seed only supports SQLite or libsql. Set DATABASE_URL=file:... or libsql:...',
     )
   }
 
-  // Safe: this seed script only runs against SQLite/libsql URLs (see runtime guard above).
-  const sqliteDb = db as unknown as LibSQLDatabase<typeof schema>
+  const sqliteDb = db
 
-  // Must match Better Auth's hasher (scrypt, `salt:key` hex) — not bcrypt.
   const defaultPasswordHash = await hashPassword('password')
 
   await sqliteDb

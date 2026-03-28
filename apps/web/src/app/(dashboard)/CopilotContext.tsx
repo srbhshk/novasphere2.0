@@ -14,6 +14,7 @@ type CopilotChatContextValue = {
   messages: UIMessage[]
   sendMessage: (opts: { text: string }) => void
   status: 'ready' | 'submitted' | 'streaming' | 'error'
+  stop: () => void
 }
 
 const CopilotChatContext = React.createContext<CopilotChatContextValue | null>(null)
@@ -59,11 +60,11 @@ export function CopilotChatProvider({
     [userId, agentRole, tenantId, pathname],
   )
 
-  const { messages, sendMessage, status } = useChat({ transport })
+  const { messages, sendMessage, status, stop } = useChat({ transport })
 
   const value = React.useMemo<CopilotChatContextValue>(
-    () => ({ messages, sendMessage, status }),
-    [messages, sendMessage, status],
+    () => ({ messages, sendMessage, status, stop }),
+    [messages, sendMessage, status, stop],
   )
 
   return (

@@ -41,9 +41,10 @@ pnpm --filter @novasphere/db build
 pnpm --filter @novasphere/db db:push      # push schema (dev)
 pnpm --filter @novasphere/db db:generate # generate migrations
 pnpm --filter @novasphere/db db:migrate  # apply migrations
-pnpm --filter @novasphere/db db:seed     # seed script
 pnpm --filter @novasphere/db db:studio   # Drizzle Studio
 ```
+
+Demo seed lives in `apps/web` (Better Auth boundary): `pnpm db:seed` or `pnpm --filter web seed:demo`.
 
 Or use root shortcuts: `pnpm db:push`, `pnpm db:seed`, `pnpm db:studio`.
 

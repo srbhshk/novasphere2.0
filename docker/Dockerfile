@@ -33,6 +33,10 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Next.js `next build` loads apps/web env validation; must be set for this stage.
+ARG BETTER_AUTH_SECRET=change-me-in-production-min-32-chars
+ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
+
 # Build packages first (respects workspace dependency order via turbo)
 RUN pnpm build --filter "@novasphere/*"
 

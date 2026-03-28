@@ -34,14 +34,15 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Next.js `next build` loads apps/web env validation; must be set for this stage.
+# CI / fork PRs may pass an empty build-arg; empty overrides ARG defaults in Docker,
+# so we coerce in-shell before builds (min 32 chars matches apps/web/src/lib/env.ts).
 ARG BETTER_AUTH_SECRET=change-me-in-production-min-32-chars
 ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
 
-# Build packages first (respects workspace dependency order via turbo)
-RUN pnpm build --filter "@novasphere/*"
-
-# Build the Next.js app in standalone mode
-RUN pnpm build --filter web
+# Build packages then web in one layer so a single export covers both `next build` invocations.
+RUN export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-change-me-in-production-min-32-chars}" && \
+    pnpm build --filter "@novasphere/*" && \
+    pnpm build --filter web
 
 # Stage 3 — minimal runtime image
 FROM node:24-alpine AS runner

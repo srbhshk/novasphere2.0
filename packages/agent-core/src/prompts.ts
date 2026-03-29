@@ -255,6 +255,96 @@ export function getSystemPrompt(role: UserRole, product: ProductConfig): string 
   ].join('\n\n')
 }
 
+type ToolLoopInstructionArgs = {
+  basePrompt: string
+  tenantId: string
+  tenantPlan: AgentContext['tenantPlan']
+  roleInProduct: string
+  uiIntent: string
+  requiresTool: boolean
+  allowedFallback: string
+  dashboardGoal?: string
+  contextSummary: string
+  forceRenderLayout: boolean
+  forceRenderLayoutRetry: boolean
+}
+
+export function buildToolLoopInstructions(args: ToolLoopInstructionArgs): string {
+  const strongLayoutOnlyInstruction = args.forceRenderLayout
+    ? [
+        'LAYOUT INTENT DETECTED:',
+        'You MUST call render_layout at least once in your response.',
+        'You may include explanation text, reasoning, and other tool calls alongside render_layout.',
+        'DO NOT return layout JSON as raw text — always use the render_layout tool.',
+        'Do NOT skip the render_layout call.',
+        args.forceRenderLayoutRetry
+          ? 'You did not call render_layout on the previous attempt. You MUST call it now before responding.'
+          : '',
+      ]
+        .filter((line) => line.length > 0)
+        .join('\n')
+    : ''
+
+  const toolInstructions = [
+    'You are the novasphere ToolLoopAgent. Use tools to compose the dashboard.',
+    'Policy contract: use contract metadata from this request to decide whether a tool call is mandatory.',
+    'If uiContract.requiresTool is true and intent is layout_change or visibility_change, call render_layout or filter_by_relevance before final text.',
+    'If uiContract.requiresTool is true and intent is anomaly_explanation, call explain_anomaly before final text.',
+    'Never ask the user questions. If intent is clarification_required, make the best assumption and proceed as informational_qna.',
+    'If there is no meaningful structural change, you may narrate a no-op recommendation while preserving current layout.',
+    strongLayoutOnlyInstruction,
+    `Tenant: ${args.tenantId} (${args.tenantPlan})`,
+    `Role context: ${args.roleInProduct}`,
+    `UI contract intent: ${args.uiIntent}`,
+    `UI contract requiresTool: ${args.requiresTool ? 'true' : 'false'}`,
+    `UI contract allowedFallback: ${args.allowedFallback}`,
+    args.dashboardGoal ? `Dashboard goal: ${args.dashboardGoal}` : '',
+    args.contextSummary,
+  ]
+
+  return [...[args.basePrompt], toolInstructions.filter((line) => line.length > 0)].join(
+    '\n\n',
+  )
+}
+
+export function buildInitialLayoutRoleHint(role: UserRole): string {
+  if (role === 'ceo') {
+    return [
+      'For this request you MUST call render_layout exactly once.',
+      'Compose a CEO executive layout with these module IDs in this order:',
+      '  Row 1 (colSpan 4 each, rowSpan 1): metric-mrr, metric-arr, metric-nrr',
+      '  Row 2 (colSpan 3 each, rowSpan 1): metric-churn, metric-arpu, metric-ltv, metric-conversion',
+      '  Row 3 (colSpan 8+4, rowSpan 2): chart-revenue-comparison, chart-pipeline',
+      '  Row 4 (colSpan 6+6, rowSpan 2): chart-top-customers, customer-table',
+    ].join('\n')
+  }
+
+  if (role === 'engineer') {
+    return [
+      'For this request you MUST call render_layout exactly once.',
+      'Compose an Engineer operational layout with these module IDs:',
+      '  Row 1 (colSpan 3 each, rowSpan 1): metric-api-latency, metric-error-rate, metric-uptime, metric-request-volume',
+      '  Row 2 (colSpan 8+4, rowSpan 2): chart-response-time, chart-error-breakdown',
+      '  Row 3 (colSpan 6+6, rowSpan 2): deployment-log, system-alerts',
+    ].join('\n')
+  }
+
+  if (role === 'admin') {
+    return [
+      'For this request you MUST call render_layout exactly once.',
+      'Compose an Admin platform layout with these module IDs:',
+      '  Row 1 (colSpan 4 each, rowSpan 1): metric-users, metric-new-signups, metric-active-orgs',
+      '  Row 2 (colSpan 4+8, rowSpan 2): chart-plan-distribution, chart-user-growth',
+      '  Row 3 (colSpan 6+6, rowSpan 2): activity-feed, pipeline-table',
+    ].join('\n')
+  }
+
+  return [
+    'For this request you MUST call render_layout exactly once.',
+    'Compose a Viewer concise layout: metric-mrr (colSpan 6), metric-users (colSpan 6), chart-revenue (colSpan 8 rowSpan 2), chart-pipeline (colSpan 4 rowSpan 2), activity-feed (colSpan 12 rowSpan 2).',
+  ].join('\n')
+}
+
 export function getLayoutPrompt(context: AgentContext): string {
   const visibleModules = context.visibleCards
     .filter((c) => c.visible)

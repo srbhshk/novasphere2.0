@@ -48,6 +48,8 @@ export { createAdapter, isServerSide } from './adapter.factory'
 
 export {
   allowedFallbackForIntent,
+  buildInitialLayoutRoleHint,
+  buildToolLoopInstructions,
   classifyUiIntent,
   getAnomalyPrompt,
   getIntentPrompt,

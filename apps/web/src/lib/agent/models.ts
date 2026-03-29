@@ -2,7 +2,8 @@ import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 
 import { env } from '@/lib/env'
-import { writeAgentLog } from './observability'
+import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
+import { novaConfig } from 'nova.config'
 
 export { DEFAULT_OLLAMA_MODEL, FALLBACK_OLLAMA_MODEL } from '@/lib/agent/ollama-defaults'
 
@@ -29,7 +30,7 @@ function warnIfModelTooSmallForGenUi(modelId: string): void {
   const billions = extractLargestParameterBillions(modelId)
   if (billions === undefined || billions >= 3) return
   warnedSmallModel = true
-  writeAgentLog({
+  writeAgentLogWithFileSink({
     level: 'warn',
     event: 'ollama_model_small',
     message: 'Model too small for GenUI — expect degraded behavior',
@@ -37,9 +38,20 @@ function warnIfModelTooSmallForGenUi(modelId: string): void {
   })
 }
 
+function resolveOllamaModelId(): string {
+  if (env.AI_LATENCY_PROFILE === 'responsive') {
+    const fromEnv = env.OLLAMA_MODEL_FAST
+    if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+      return fromEnv
+    }
+    return novaConfig.agent.ollamaModelFast
+  }
+  return env.OLLAMA_MODEL
+}
+
 export function createOllamaModel(): LanguageModel {
   const baseURL = `${env.OLLAMA_BASE_URL}/v1`
-  const modelName = env.OLLAMA_MODEL
+  const modelName = resolveOllamaModelId()
 
   warnIfModelTooSmallForGenUi(modelName)
 
@@ -81,11 +93,38 @@ export async function createOpenAIModel(): Promise<LanguageModel | null> {
   return openai('gpt-4o-mini')
 }
 
+async function isOllamaReachable(): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
+
+  try {
+    const response = await fetch(`${env.OLLAMA_BASE_URL}/api/tags`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+    return response.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function getActiveModel(): Promise<LanguageModel> {
-  // Priority order required by task: Ollama -> Claude -> OpenAI.
-  const ollamaModel = createOllamaModel()
-  if (ollamaModel) {
-    return ollamaModel
+  if (env.AI_PROVIDER === 'claude') {
+    const model = await createClaudeModel()
+    if (model) return model
+    throw new Error('AI_PROVIDER=claude requires ANTHROPIC_API_KEY')
+  }
+
+  if (env.AI_PROVIDER === 'openai') {
+    const model = await createOpenAIModel()
+    if (model) return model
+    throw new Error('AI_PROVIDER=openai requires OPENAI_API_KEY')
+  }
+
+  if (env.AI_PROVIDER === 'ollama') {
+    return createOllamaModel()
   }
 
   const claudeModel = await createClaudeModel()
@@ -96,6 +135,12 @@ export async function getActiveModel(): Promise<LanguageModel> {
   const openaiModel = await createOpenAIModel()
   if (openaiModel) {
     return openaiModel
+  }
+
+  if (!(await isOllamaReachable())) {
+    throw new Error(
+      'No AI provider available: set ANTHROPIC_API_KEY or OPENAI_API_KEY, or start Ollama.',
+    )
   }
 
   return createOllamaModel()

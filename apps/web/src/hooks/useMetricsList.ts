@@ -64,21 +64,38 @@ async function fetchMetrics(role: string): Promise<MetricsListResult> {
   const data = (await res.json()) as { kpis?: KpiMetric[] } & Record<string, unknown>
   const kpis: KpiMetric[] = Array.isArray(data.kpis) ? data.kpis : []
 
+  const revenueHistory = Array.isArray(data['revenueHistory'])
+    ? (data['revenueHistory'] as MetricsListResult['revenueHistory'])
+    : MOCK_REVENUE_HISTORY
+  const pipelineStages = Array.isArray(data['pipelineByStage'])
+    ? (data['pipelineByStage'] as MetricsListResult['pipelineStages'])
+    : MOCK_PIPELINE_STAGES
+  const activityHeatmap = Array.isArray(data['activityHeatmap'])
+    ? (data['activityHeatmap'] as MetricsListResult['activityHeatmap'])
+    : MOCK_ACTIVITY_HEATMAP
+
   const mrr = kpiToMetric(findKpi(kpis, 'mrr'), MOCK_MRR)
   const churn = kpiToMetric(findKpi(kpis, 'churn'), MOCK_CHURN)
   const activeUsers = kpiToMetric(
     findKpi(kpis, 'total-users') ?? findKpi(kpis, 'active-users'),
     MOCK_ACTIVE_USERS,
   )
+  const sparklineFromKpi = findKpi(kpis, 'mrr')?.sparkline
+  const sparklineData = Array.isArray(sparklineFromKpi)
+    ? sparklineFromKpi.map((value, index) => ({
+        value,
+        label: `${index + 1}`,
+      }))
+    : MOCK_SPARKLINE_DATA
 
   return {
     mrr,
     churn,
     activeUsers,
-    revenueHistory: MOCK_REVENUE_HISTORY,
-    pipelineStages: MOCK_PIPELINE_STAGES,
-    activityHeatmap: MOCK_ACTIVITY_HEATMAP,
-    sparklineData: MOCK_SPARKLINE_DATA,
+    revenueHistory,
+    pipelineStages,
+    activityHeatmap,
+    sparklineData,
   }
 }
 

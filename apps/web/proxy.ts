@@ -9,11 +9,10 @@ import type { NextRequest } from 'next/server'
  * - Redirect unauthenticated users to /sign-in for protected routes.
  * - Forward requests as-is for public routes and authenticated users.
  *
- * Role injection is NOT done here by design: every client-initiated
- * API call (TanStack Query hooks, DefaultChatTransport, fetch in
- * dashboard/page.tsx) explicitly includes x-user-role from the
- * client's Better Auth session. The session now correctly contains
- * the user's role via user.additionalFields (see auth.ts + seed.ts).
+ * Role / user id for authorization on API routes come from the validated
+ * Better Auth session in route handlers (e.g. POST /api/agent overwrites
+ * client-supplied x-user-* headers). Client headers remain hints for
+ * same-origin data hooks only.
  */
 
 const PUBLIC_PREFIXES = ['/sign-in', '/sign-up', '/forgot-password', '/api/auth']

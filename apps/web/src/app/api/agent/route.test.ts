@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getWarnModeStatus } from './route'
+import { getWarnModeStatus } from './warn-mode'
 
 describe('agent contract warn mode window', () => {
   it('stays in warn mode within 21 days', () => {

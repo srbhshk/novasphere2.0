@@ -33,11 +33,16 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build packages first (respects workspace dependency order via turbo)
-RUN pnpm build --filter "@novasphere/*"
+# Next.js `next build` loads apps/web env validation; must be set for this stage.
+# CI / fork PRs may pass an empty build-arg; empty overrides ARG defaults in Docker,
+# so we coerce in-shell before builds (min 32 chars matches apps/web/src/lib/env.ts).
+ARG BETTER_AUTH_SECRET=change-me-in-production-min-32-chars
+ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
 
-# Build the Next.js app in standalone mode
-RUN pnpm build --filter web
+# Build packages then web in one layer so a single export covers both `next build` invocations.
+RUN export BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-change-me-in-production-min-32-chars}" && \
+    pnpm build --filter "@novasphere/*" && \
+    pnpm build --filter web
 
 # Stage 3 — minimal runtime image
 FROM node:24-alpine AS runner
@@ -55,7 +60,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/packages/db ./packages/db
 COPY --from=builder --chown=nextjs:nodejs /app/packages/db/node_modules ./packages/db/node_modules
+COPY --chown=nextjs:nodejs ./docker/web-entrypoint.sh ./docker/web-entrypoint.sh
 
 # pnpm workspaces keep many packages under package-local node_modules (symlinked to the pnpm store).
 # Next.js standalone server resolves some dependencies from /app/node_modules, so we expose drizzle-orm there.
@@ -65,6 +72,7 @@ RUN ln -sfn /app/packages/db/node_modules/drizzle-orm /app/node_modules/drizzle-
 
 # Writable directory for SQLite database
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+RUN chmod +x /app/docker/web-entrypoint.sh
 
 USER nextjs
 
@@ -73,4 +81,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # next.config.ts must set output: 'standalone' for this to work
-CMD ["node", "apps/web/server.js"]
+CMD ["/app/docker/web-entrypoint.sh"]

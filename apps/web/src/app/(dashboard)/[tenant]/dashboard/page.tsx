@@ -9,17 +9,38 @@ import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
 import type { GenUiToolName } from '@/lib/agent/genui/tools'
-import { extractToolCalls } from '@/lib/agent/genui/tool-parser'
+import { extractToolCallsForExecution } from '@/lib/agent/genui/tool-parser'
 import { MODULE_REGISTRY } from './modules/registry'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
 import { classifyUiIntent, requiresToolForIntent } from '@novasphere/agent-core'
-import { DEFAULT_OLLAMA_MODEL } from '@/lib/agent/ollama-defaults'
+import type { AdapterType } from '@novasphere/agent-core'
 import type { MetricsListResult } from '@/hooks/useMetricsList'
 import { useCopilotChat } from '../../CopilotContext'
+import DashboardErrorBoundary from '../../DashboardErrorBoundary'
 
 const TOOL_RETRY_FEEDBACK_PREFIX = 'Tool call failed:'
+type AgentRuntimeStatusResponse = {
+  adapterType: AdapterType
+  adapterModel: string
+}
+
+function isAgentRuntimeStatusResponse(
+  value: unknown,
+): value is AgentRuntimeStatusResponse {
+  if (typeof value !== 'object' || value == null) return false
+  // Safety: guarded by object/null checks immediately above.
+  const record = value as Record<string, unknown>
+  const adapterType = record['adapterType']
+  const adapterModel = record['adapterModel']
+  const validType =
+    adapterType === 'ollama' ||
+    adapterType === 'claude' ||
+    adapterType === 'openai' ||
+    adapterType === 'mock'
+  return validType && typeof adapterModel === 'string' && adapterModel.length > 0
+}
 
 // ---------------------------------------------------------------------------
 // Role-based default layouts
@@ -373,8 +394,7 @@ export default function DashboardPage(): React.JSX.Element {
   const setAdapterStatus = useAgentPanelStore((s) => s.setAdapterStatus)
   const suggestions = useAgentPanelStore((s) => s.suggestions)
   const processedToolRef = useRef<Set<string>>(new Set())
-  const anomalyExplainedRef = useRef<boolean>(false)
-  const initialLayoutRequestedRef = useRef<boolean>(false)
+  const initialBootstrapSentRef = useRef<boolean>(false)
   const toolRetryCountRef = useRef<number>(0)
 
   const { messages, sendMessage, status } = useCopilotChat()
@@ -387,45 +407,59 @@ export default function DashboardPage(): React.JSX.Element {
   )
 
   useEffect(() => {
+    let mounted = true
     setAdapterType('ollama')
-    setAdapterModel(DEFAULT_OLLAMA_MODEL)
+    setAdapterModel(null)
     setAdapterStatus('idle')
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/agent/status', { method: 'GET' })
+        if (!response.ok) return
+        const payload: unknown = await response.json()
+        if (!isAgentRuntimeStatusResponse(payload)) return
+        if (!mounted) return
+        setAdapterType(payload.adapterType)
+        setAdapterModel(payload.adapterModel)
+      } catch {
+        // Keep optimistic local defaults when runtime status endpoint is unavailable.
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
 
-  // Auto-explain anomaly once on load
+  // Single bootstrap turn: anomaly + initial layout in one request when data shows an anomaly,
+  // otherwise layout-only. Avoids racing two effects on `messages.length`.
   useEffect(() => {
-    if (!hasResolvedSession) return
-    if (anomalyExplainedRef.current) return
-    if (metricsPending || anomalyMetric == null || isGenerating) return
-    if (status === 'streaming' || status === 'submitted') return
-    anomalyExplainedRef.current = true
-    sendMessage({
-      text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}`,
-    })
-  }, [
-    hasResolvedSession,
-    metricsPending,
-    anomalyMetric,
-    isGenerating,
-    status,
-    sendMessage,
-  ])
-
-  // Compose initial layout from the AI on first load via the chat transport only.
-  // This keeps /api/agent on a single request schema (messages).
-  useEffect(() => {
-    if (isPending) return
-    if (!hasResolvedSession) return
+    if (isPending || !hasResolvedSession) return
+    if (metricsPending) return
     if (status === 'submitted' || status === 'streaming') return
-    if (initialLayoutRequestedRef.current) return
-    if (messages.length > 0) return
+    if (initialBootstrapSentRef.current) return
 
-    initialLayoutRequestedRef.current = true
+    initialBootstrapSentRef.current = true
     setGenerating(true)
-    sendMessage({
-      text: 'Compose the initial dashboard layout for this user.',
-    })
-  }, [hasResolvedSession, isPending, messages.length, sendMessage, setGenerating, status])
+    if (anomalyMetric != null) {
+      sendMessage({
+        text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}. Then compose the initial dashboard layout for this user (role: ${agentRole}) using the render_layout tool with role-appropriate modules.`,
+      })
+    } else {
+      sendMessage({
+        text: 'Compose the initial dashboard layout for this user.',
+      })
+    }
+  }, [
+    agentRole,
+    anomalyMetric,
+    hasResolvedSession,
+    isPending,
+    metricsPending,
+    sendMessage,
+    setGenerating,
+    status,
+  ])
 
   useEffect(() => {
     if (status === 'ready') {
@@ -454,18 +488,21 @@ export default function DashboardPage(): React.JSX.Element {
     const stores = { layoutStore, agentStore }
 
     for (const msg of messages) {
+      // Safety: UI messages are object-like and are narrowed before key access.
       const m = msg as unknown as Record<string, unknown>
       const id = m['id'] as string | undefined
       if (!id) continue
-      const toolCalls = extractToolCalls(m)
+      const toolCalls = extractToolCallsForExecution(m)
       for (const { toolCallId, toolName, args } of toolCalls) {
         const key = `${id}-${toolCallId}-${toolName}`
         if (processedToolRef.current.has(key)) continue
         processedToolRef.current.add(key)
 
         const result = executeToolCall(
+          // Safety: toolName comes from parsed tool payload matched against registered names.
           toolName as GenUiToolName,
           args,
+          // Safety: stores object matches executeToolCall store contract shape.
           stores as Parameters<typeof executeToolCall>[2],
         )
 
@@ -502,6 +539,7 @@ export default function DashboardPage(): React.JSX.Element {
 
     if (!lastUser) return
 
+    // Safety: AI message entries are narrowed to object records before field reads.
     const lastUserRecord = lastUser as unknown as Record<string, unknown>
     const parts = lastUserRecord['parts']
     const text = Array.isArray(parts)
@@ -536,9 +574,11 @@ export default function DashboardPage(): React.JSX.Element {
       )
     if (!lastAssistant || !lastUser) return
 
+    // Safety: both messages are object-like records after array/role guards.
     const assistantRecord = lastAssistant as unknown as Record<string, unknown>
+    // Safety: both messages are object-like records after array/role guards.
     const userRecord = lastUser as unknown as Record<string, unknown>
-    const assistantToolCalls = extractToolCalls(assistantRecord)
+    const assistantToolCalls = extractToolCallsForExecution(assistantRecord)
     if (assistantToolCalls.length > 0) return
 
     const userParts = userRecord['parts']
@@ -578,56 +618,43 @@ export default function DashboardPage(): React.JSX.Element {
     setSuggestions(fallbackSuggestions)
   }, [messages, setSuggestions, status, suggestions.length])
 
-  const chatBusy = status === 'streaming' || status === 'submitted'
-  void chatBusy
-
   return (
     <div className="min-h-0 w-full">
-      {layout == null && isGenerating ? (
-        // Skeleton state: LLM is composing the initial layout
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-            gridAutoRows: 'minmax(120px, auto)',
-            gap: '16px',
-            width: '100%',
-          }}
-        >
-          {(
-            [
-              { cols: 4, rows: 1 },
-              { cols: 4, rows: 1 },
-              { cols: 4, rows: 1 },
-              { cols: 8, rows: 2 },
-              { cols: 4, rows: 2 },
-              { cols: 6, rows: 2 },
-              { cols: 6, rows: 2 },
-            ] as Array<{ cols: number; rows: number }>
-          ).map((cell, i) => (
-            <GlassCard
-              key={i}
-              variant="subtle"
-              className="flex h-full flex-col gap-3 p-4"
-              style={{
-                gridColumn: `span ${cell.cols} / span ${cell.cols}`,
-                gridRow: `span ${cell.rows} / span ${cell.rows}`,
-              }}
-            >
-              <Skeleton rounded="md" className="h-4 w-1/3" />
-              <Skeleton rounded="md" className="h-8 w-2/3" />
-              {cell.rows > 1 && <Skeleton rounded="md" className="flex-1" />}
-            </GlassCard>
-          ))}
-        </div>
-      ) : (
-        <BentoGrid
-          layout={layout ?? getDefaultLayoutForRole(agentRole)}
-          modules={MODULE_REGISTRY}
-          onReorder={(next) => setLayout(next)}
-          className="h-full w-full"
-        />
-      )}
+      <DashboardErrorBoundary>
+        {layout == null && isGenerating ? (
+          // Skeleton state: LLM is composing the initial layout
+          <div className="grid w-full auto-rows-[minmax(120px,auto)] grid-cols-12 gap-4">
+            {(
+              [
+                { spanClass: 'col-span-4 row-span-1', rows: 1 },
+                { spanClass: 'col-span-4 row-span-1', rows: 1 },
+                { spanClass: 'col-span-4 row-span-1', rows: 1 },
+                { spanClass: 'col-span-8 row-span-2', rows: 2 },
+                { spanClass: 'col-span-4 row-span-2', rows: 2 },
+                { spanClass: 'col-span-6 row-span-2', rows: 2 },
+                { spanClass: 'col-span-6 row-span-2', rows: 2 },
+              ] as Array<{ spanClass: string; rows: number }>
+            ).map((cell, i) => (
+              <GlassCard
+                key={i}
+                variant="subtle"
+                className={`flex h-full flex-col gap-3 p-4 ${cell.spanClass}`}
+              >
+                <Skeleton rounded="md" className="h-4 w-1/3" />
+                <Skeleton rounded="md" className="h-8 w-2/3" />
+                {cell.rows > 1 && <Skeleton rounded="md" className="flex-1" />}
+              </GlassCard>
+            ))}
+          </div>
+        ) : (
+          <BentoGrid
+            layout={layout ?? getDefaultLayoutForRole(agentRole)}
+            modules={MODULE_REGISTRY}
+            onReorder={(next) => setLayout(next)}
+            className="h-full w-full"
+          />
+        )}
+      </DashboardErrorBoundary>
     </div>
   )
 }

@@ -1,20 +1,9 @@
 import { NextResponse } from 'next/server'
 import { ENGINEER_METRICS, SYSTEM_ALERTS } from '@/mocks/engineer.mock'
-
-function resolveRole(header: string | null): 'admin' | 'ceo' | 'engineer' | 'viewer' {
-  if (
-    header === 'admin' ||
-    header === 'ceo' ||
-    header === 'engineer' ||
-    header === 'viewer'
-  ) {
-    return header
-  }
-  return 'viewer'
-}
+import { resolveRoleFromSession } from '@/lib/auth/resolve-role'
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const role = resolveRole(request.headers.get('x-user-role'))
+  const role = await resolveRoleFromSession(request)
 
   if (role === 'engineer' || role === 'admin') {
     return NextResponse.json({

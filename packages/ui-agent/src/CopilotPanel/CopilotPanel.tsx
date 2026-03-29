@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import { Send, X, Bot } from 'lucide-react'
+import { Bot, Send, Square, X } from 'lucide-react'
 import type { AdapterType, AgentStatus, SuggestionChip } from '@novasphere/agent-core'
 import { GlassPanel } from '@novasphere/ui-glass'
 import { AdapterStatusBadge } from '../AdapterStatusBadge/AdapterStatusBadge'
@@ -27,6 +27,12 @@ type MessageLike = {
 export type CopilotPanelProps = {
   messages: unknown[]
   isLoading: boolean
+  /** When true (default), textarea is disabled while a turn is in flight. */
+  lockInputWhileBusy?: boolean
+  /** When true with `isLoading`, Send still calls `onSend` (parent may queue). */
+  allowSendWhileBusy?: boolean
+  /** Abort in-flight generation (from `useChat().stop`). */
+  onStop?: () => void
   streamingContent?: string
   suggestions?: SuggestionChip[]
   adapterType: AdapterType | null
@@ -88,6 +94,9 @@ function toAgentMessage(
 export function CopilotPanel({
   messages,
   isLoading,
+  lockInputWhileBusy = true,
+  allowSendWhileBusy = false,
+  onStop,
   streamingContent,
   suggestions = [],
   adapterType,
@@ -112,9 +121,12 @@ export function CopilotPanel({
   const normalizedMessages = messages.filter(isMessageLike).map(toAgentMessage)
   const showDownloadBar = adapterStatus === 'downloading' && downloadProgress > 0
 
+  const blockSendWhileBusy = isLoading && !allowSendWhileBusy
+  const inputLocked = lockInputWhileBusy && isLoading
+
   const handleSubmit = (): void => {
     const raw = inputRef.current?.value?.trim()
-    if (!raw || isLoading) return
+    if (!raw || blockSendWhileBusy) return
     onSend(raw)
     if (inputRef.current) inputRef.current.value = ''
   }
@@ -235,15 +247,27 @@ export function CopilotPanel({
           ref={inputRef}
           placeholder="Ask anything…"
           rows={2}
-          disabled={isLoading}
+          disabled={inputLocked}
           onKeyDown={handleKeyDown}
           className="min-h-[44px] w-full resize-none rounded-lg border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] px-3 py-2 text-sm text-[var(--ns-color-text)] placeholder:text-[var(--ns-color-muted)] focus:ring-2 focus:ring-[var(--ns-color-accent)]/50 focus:outline-none disabled:opacity-50"
           aria-label="Message"
         />
+        {onStop != null && isLoading ? (
+          <button
+            type="button"
+            onClick={() => {
+              onStop()
+            }}
+            className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] text-[var(--ns-color-text)] hover:opacity-90"
+            aria-label="Stop generation"
+          >
+            <Square className="h-4 w-4 fill-current" />
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={isLoading}
+          disabled={blockSendWhileBusy}
           className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg bg-[var(--ns-color-accent)] text-white hover:opacity-90 disabled:opacity-50"
           aria-label="Send"
         >

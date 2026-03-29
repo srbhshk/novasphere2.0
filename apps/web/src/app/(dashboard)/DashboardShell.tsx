@@ -113,14 +113,11 @@ export default function DashboardShell({
           sidebarBottomSlot={sidebarBottomSlot}
         >
           <div
-            className="min-h-0"
-            style={
+            className={`min-h-0 ${
               isCopilotOpen
-                ? {
-                    paddingRight: '396px',
-                  }
-                : undefined
-            }
+                ? 'pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
+                : ''
+            }`}
           >
             {children}
           </div>

@@ -2,26 +2,15 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAdminActivity, getViewerActivity } from '@/mocks/admin.mock'
 import { getEngineerActivity } from '@/mocks/engineer.mock'
+import { resolveRoleFromSession } from '@/lib/auth/resolve-role'
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
-function resolveRole(header: string | null): 'admin' | 'ceo' | 'engineer' | 'viewer' {
-  if (
-    header === 'admin' ||
-    header === 'ceo' ||
-    header === 'engineer' ||
-    header === 'viewer'
-  ) {
-    return header
-  }
-  return 'viewer'
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
-  const role = resolveRole(request.headers.get('x-user-role'))
+  const role = await resolveRoleFromSession(request)
 
   const url = new URL(request.url)
   const params = querySchema.safeParse({

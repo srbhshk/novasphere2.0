@@ -4,9 +4,14 @@ import { z } from 'zod'
 import { headers } from 'next/headers'
 import { buildAgentContext } from '@/lib/agent/context-builder'
 import { detectLayoutIntent, novaAgent } from '@/lib/agent/nova-agent'
-import { genUiTools, renderLayoutSchema } from '@/lib/agent/genui/tools'
-import { writeAgentLog } from '@/lib/agent/observability'
+import { genUiTools } from '@/lib/agent/genui/tools'
+import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
 import { createAuth } from '@/lib/auth/auth'
+import { env } from '@/lib/env'
+import { getWarnModeStatus } from './warn-mode'
+
+/** Serverless ceiling; keep above `AGENT_TURN_TIMEOUT_MS` + buffer. */
+export const maxDuration = 180
 
 type RateWindow = {
   count: number
@@ -19,7 +24,9 @@ const useChatBodySchema = z.object({
   messages: z.array(z.record(z.string(), z.unknown())),
 })
 
-const WARN_MODE_DAYS = 21
+function elapsedMs(startMs: number): number {
+  return Date.now() - startMs
+}
 
 function getRateLimitPerMinute(): number {
   const raw = process.env['RATE_LIMIT_AGENT_RPM']
@@ -30,7 +37,17 @@ function getRateLimitPerMinute(): number {
   return 20
 }
 
+function pruneExpiredRateWindows(): void {
+  const now = Date.now()
+  for (const [key, window] of [...RATE_WINDOWS.entries()]) {
+    if (window.resetAt <= now) {
+      RATE_WINDOWS.delete(key)
+    }
+  }
+}
+
 function checkRateLimit(key: string): boolean {
+  pruneExpiredRateWindows()
   const now = Date.now()
   const windowMs = 60_000
   const limit = getRateLimitPerMinute()
@@ -72,6 +89,39 @@ function getLastUserMessage(messages: Array<Record<string, unknown>>): string {
   return ''
 }
 
+function summarizeConversationHistory(messages: Array<Record<string, unknown>>): string {
+  const recent = messages.slice(-8)
+  const summaryLines: string[] = []
+
+  for (const message of recent) {
+    const role = message['role']
+    if (role !== 'user' && role !== 'assistant') continue
+
+    const content = message['content']
+    if (typeof content === 'string' && content.length > 0) {
+      summaryLines.push(`${role}: ${content}`)
+      continue
+    }
+
+    if (Array.isArray(content)) {
+      const textParts = content
+        .filter(
+          (part): part is Record<string, unknown> =>
+            typeof part === 'object' &&
+            part !== null &&
+            (part as Record<string, unknown>)['type'] === 'text',
+        )
+        .map((part) => part['text'])
+        .filter((text): text is string => typeof text === 'string' && text.length > 0)
+      if (textParts.length > 0) {
+        summaryLines.push(`${role}: ${textParts.join(' ')}`)
+      }
+    }
+  }
+
+  return summaryLines.join('\n')
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -101,37 +151,43 @@ function normalizeUserRole(
   return null
 }
 
-async function resolveRoleFromSessionOrHeader(
-  request: Request,
-): Promise<'admin' | 'ceo' | 'engineer' | 'viewer'> {
-  const headerRole = normalizeUserRole(request.headers.get('x-user-role'))
-
+/**
+ * Canonical identity for agent routes — session only (no client header trust).
+ */
+async function resolveAgentIdentityFromSession(): Promise<{
+  userId: string
+  role: 'admin' | 'ceo' | 'engineer' | 'viewer'
+}> {
   try {
     const auth = await createAuth()
     const session = await auth.api.getSession({ headers: await headers() })
     if (session == null || !isRecord(session)) {
-      return headerRole ?? 'viewer'
+      return { userId: 'anonymous', role: 'viewer' }
     }
 
     const user = session['user']
     if (!isRecord(user)) {
-      return headerRole ?? 'viewer'
+      return { userId: 'anonymous', role: 'viewer' }
     }
 
+    const idRaw = user['id']
+    const userId = typeof idRaw === 'string' && idRaw.length > 0 ? idRaw : 'anonymous'
     const sessionRole = normalizeUserRole(user['role'])
-    return sessionRole ?? headerRole ?? 'viewer'
+    return { userId, role: sessionRole ?? 'viewer' }
   } catch {
-    return headerRole ?? 'viewer'
+    return { userId: 'anonymous', role: 'viewer' }
   }
 }
 
-export function getWarnModeStatus(now: number = Date.now()): {
-  warnMode: boolean
-  dayIndex: number
-} {
-  const sinceMs = now - Date.UTC(2026, 2, 24, 0, 0, 0, 0)
-  const dayIndex = Math.floor(sinceMs / 86_400_000) + 1
-  return { warnMode: dayIndex <= WARN_MODE_DAYS, dayIndex }
+function buildAgentAbortSignal(request: Request, timeoutMs: number): AbortSignal {
+  const candidates: AbortSignal[] = [request.signal]
+  if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+    candidates.push(AbortSignal.timeout(timeoutMs))
+  }
+  if (candidates.length === 1) {
+    return candidates[0]!
+  }
+  return AbortSignal.any(candidates)
 }
 
 function inspectToolMarker(chunk: string): boolean {
@@ -173,7 +229,6 @@ function inspectToolMarker(chunk: string): boolean {
   }
 
   const lines = chunk.split('\n')
-  let sawParsableJson = false
 
   for (const rawLine of lines) {
     const line = rawLine.trim()
@@ -185,7 +240,6 @@ function inspectToolMarker(chunk: string): boolean {
       if (payload.length === 0 || payload === '[DONE]') continue
       const parsed = tryParseJson(payload)
       if (parsed == null) continue
-      sawParsableJson = true
       if (containsToolEvent(parsed)) return true
       continue
     }
@@ -194,77 +248,13 @@ function inspectToolMarker(chunk: string): boolean {
     if (line.startsWith('{') || line.startsWith('[')) {
       const parsed = tryParseJson(line)
       if (parsed == null) continue
-      sawParsableJson = true
       if (containsToolEvent(parsed)) return true
     }
   }
 
   // If this chunk contains parsable JSON and none had tool events, return false.
   // If this chunk is partial/unparseable, we intentionally return false to avoid false positives.
-  return sawParsableJson ? false : false
-}
-
-async function bufferResponse(
-  response: Response,
-): Promise<{ text: string; toolDetected: boolean }> {
-  if (response.body == null) {
-    return { text: '', toolDetected: false }
-  }
-  const text = await response.text()
-  return { text, toolDetected: inspectToolMarker(text) }
-}
-
-function detectFakeRenderLayoutJson(text: string): boolean {
-  const max = 200_000
-  const trimmed = text.trim()
-  const input = trimmed.length > max ? trimmed.slice(0, max) : trimmed
-
-  function tryParse(candidate: string): unknown | null {
-    try {
-      return JSON.parse(candidate) as unknown
-    } catch {
-      return null
-    }
-  }
-
-  function looksLikeRenderLayout(value: unknown): boolean {
-    const parsed = renderLayoutSchema.safeParse(value)
-    return parsed.success
-  }
-
-  // Prefer fenced JSON blocks: ```json ... ```
-  const fenceRegex = /```json\s*([\s\S]*?)\s*```/g
-  for (const match of input.matchAll(fenceRegex)) {
-    const candidate = match[1]
-    if (typeof candidate !== 'string' || candidate.trim().length === 0) continue
-    const parsed = tryParse(candidate.trim())
-    if (parsed != null && looksLikeRenderLayout(parsed)) return true
-  }
-
-  // Whole-body JSON
-  if (input.startsWith('{') || input.startsWith('[')) {
-    const parsed = tryParse(input)
-    if (parsed != null && looksLikeRenderLayout(parsed)) return true
-  }
-
-  // Best-effort extraction of a JSON object substring.
-  const firstBrace = input.indexOf('{')
-  const lastBrace = input.lastIndexOf('}')
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    const candidate = input.slice(firstBrace, lastBrace + 1)
-    const parsed = tryParse(candidate)
-    if (parsed != null && looksLikeRenderLayout(parsed)) return true
-  }
-
   return false
-}
-
-function cloneResponseFromText(source: Response, text: string): Response {
-  return new Response(text, {
-    status: source.status,
-    statusText: source.statusText,
-    headers: source.headers,
-  })
 }
 
 function wrapResponseWithContractLogging(
@@ -307,12 +297,12 @@ function wrapResponseWithContractLogging(
           dayIndex: contract.dayIndex,
         }
         if (!toolDetected) {
-          writeAgentLog({
+          writeAgentLogWithFileSink({
             event: 'contract_violation',
             ...base,
           })
         } else {
-          writeAgentLog({
+          writeAgentLogWithFileSink({
             event: 'contract_compliant',
             ...base,
           })
@@ -348,28 +338,49 @@ function wrapResponseWithContractLogging(
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const userId = request.headers.get('x-user-id') ?? 'anonymous'
-  if (!checkRateLimit(userId)) {
+  const requestStartedAtMs = Date.now()
+  const turnId = request.headers.get('x-turn-id') ?? crypto.randomUUID()
+  const identity = await resolveAgentIdentityFromSession()
+  const canonicalUserId = identity.userId
+  writeAgentLogWithFileSink({
+    event: 'agent_timing_request_received',
+    turnId,
+    userId: canonicalUserId,
+  })
+  if (!checkRateLimit(canonicalUserId)) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
   }
 
+  // Safety: request payload is validated by `useChatBodySchema` before it is consumed.
   const rawBody = (await request.json()) as Record<string, unknown>
 
   const useChatParsed = useChatBodySchema.safeParse(rawBody)
   let userMessage: string
   let currentRoute: string
+  let conversationHistory: string
   let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>> | undefined
 
   if (!useChatParsed.success || useChatParsed.data.messages.length === 0) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
+  writeAgentLogWithFileSink({
+    event: 'agent_timing_request_validated',
+    turnId,
+    elapsedMs: elapsedMs(requestStartedAtMs),
+  })
 
+  // Safety: messages have passed schema validation and are object-like entries.
   userMessage = getLastUserMessage(
     useChatParsed.data.messages as Array<Record<string, unknown>>,
   )
+  conversationHistory = summarizeConversationHistory(
+    useChatParsed.data.messages as Array<Record<string, unknown>>,
+  )
+  // Safety: headers return string|null and the null case is handled by fallback.
   currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
   try {
     modelMessages = await convertToModelMessages(
+      // Safety: validated useChat payload matches AI SDK model message conversion input.
       useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
       {
         tools: genUiTools,
@@ -381,39 +392,63 @@ export async function POST(request: Request): Promise<Response> {
     modelMessages = undefined
   }
 
-  const canonicalRole = await resolveRoleFromSessionOrHeader(request)
   const contextHeaders = new Headers(request.headers)
-  contextHeaders.set('x-user-role', canonicalRole)
+  contextHeaders.set('x-user-id', identity.userId)
+  contextHeaders.set('x-user-role', identity.role)
+  contextHeaders.set('x-turn-id', turnId)
 
+  const contextBuildStartMs = Date.now()
   const context = await buildAgentContext({
     headers: contextHeaders,
     userMessage,
-    conversationHistory: '',
+    conversationHistory,
     currentRoute,
+  })
+  writeAgentLogWithFileSink({
+    event: 'agent_timing_context_built',
+    turnId,
+    contextBuildMs: elapsedMs(contextBuildStartMs),
+    totalElapsedMs: elapsedMs(requestStartedAtMs),
   })
 
   const isLayoutIntent = detectLayoutIntent(userMessage)
+  const streamStartMs = Date.now()
+  const abortSignal = buildAgentAbortSignal(request, env.AGENT_TURN_TIMEOUT_MS)
   const runResult =
     modelMessages != null && modelMessages.length > 0
       ? await novaAgent.stream({
           messages: modelMessages,
           options: context,
           forceRenderLayout: isLayoutIntent,
+          abortSignal,
+          turnTimeoutMs: env.AGENT_TURN_TIMEOUT_MS,
         })
       : await novaAgent.stream({
           prompt: userMessage,
           options: context,
           forceRenderLayout: isLayoutIntent,
+          abortSignal,
+          turnTimeoutMs: env.AGENT_TURN_TIMEOUT_MS,
         })
+  writeAgentLogWithFileSink({
+    event: 'agent_timing_ai_stream_created',
+    turnId,
+    aiSetupMs: elapsedMs(streamStartMs),
+    totalElapsedMs: elapsedMs(requestStartedAtMs),
+    layoutIntent: isLayoutIntent,
+    requiresTool: context.uiContract?.requiresTool === true,
+  })
 
   if (runResult == null || typeof runResult !== 'object') {
     return NextResponse.json({ error: 'Agent stream unavailable' }, { status: 500 })
   }
 
-  const toUIMessageStreamResponse = (
-    runResult as { toUIMessageStreamResponse?: () => Response }
-  ).toUIMessageStreamResponse
+  const toUIMessageStreamResponse =
+    // Safety: AI SDK stream result exposes an optional `toUIMessageStreamResponse` method.
+    (runResult as { toUIMessageStreamResponse?: () => Response })
+      .toUIMessageStreamResponse
   if (typeof toUIMessageStreamResponse === 'function') {
+    const responseFactoryStartMs = Date.now()
     const streamResponse = toUIMessageStreamResponse.call(runResult)
     const { warnMode, dayIndex } = getWarnModeStatus()
     const wrapped = wrapResponseWithContractLogging(streamResponse, {
@@ -426,82 +461,14 @@ export async function POST(request: Request): Promise<Response> {
       dayIndex,
     })
 
-    const shouldEnforceToolRetry =
-      isLayoutIntent || context.uiContract?.requiresTool === true
-    if (!shouldEnforceToolRetry) {
-      return wrapped
-    }
-
-    const buffered = await bufferResponse(wrapped)
-    if (buffered.toolDetected) {
-      return cloneResponseFromText(wrapped, buffered.text)
-    }
-
-    const fakeJsonDetected = detectFakeRenderLayoutJson(buffered.text)
-    if (fakeJsonDetected) {
-      writeAgentLog({
-        event: 'fake_json_render_layout_text_detected',
-        role: context.userRole,
-        tenantId: context.tenantId,
-        productDomain: context.productDomain,
-      })
-    }
-
-    writeAgentLog({
-      event: 'layout_intent_missing_tool_retry',
-      role: context.userRole,
-      tenantId: context.tenantId,
-      productDomain: context.productDomain,
+    writeAgentLogWithFileSink({
+      event: 'agent_timing_stream_returned',
+      turnId,
+      responseFactoryMs: elapsedMs(responseFactoryStartMs),
+      totalElapsedMs: elapsedMs(requestStartedAtMs),
+      streamingPassthrough: true,
     })
-
-    const retryRunResult =
-      modelMessages != null && modelMessages.length > 0
-        ? await novaAgent.stream({
-            messages: modelMessages,
-            options: context,
-            forceRenderLayout: true,
-            forceRenderLayoutRetry: true,
-          })
-        : await novaAgent.stream({
-            prompt: userMessage,
-            options: context,
-            forceRenderLayout: true,
-            forceRenderLayoutRetry: true,
-          })
-
-    const retryToUIMessageStreamResponse = (
-      retryRunResult as { toUIMessageStreamResponse?: () => Response }
-    ).toUIMessageStreamResponse
-    if (typeof retryToUIMessageStreamResponse !== 'function') {
-      return NextResponse.json(
-        { error: 'Agent stream format unsupported' },
-        { status: 500 },
-      )
-    }
-
-    const retryStreamResponse = retryToUIMessageStreamResponse.call(retryRunResult)
-    const retryWrapped = wrapResponseWithContractLogging(retryStreamResponse, {
-      requiresTool: true,
-      intent: context.uiContract?.intent ?? 'informational_qna',
-      role: context.userRole,
-      tenantId: context.tenantId,
-      productDomain: context.productDomain,
-      warnMode,
-      dayIndex,
-    })
-    const retryBuffered = await bufferResponse(retryWrapped)
-    if (retryBuffered.toolDetected) {
-      return cloneResponseFromText(retryWrapped, retryBuffered.text)
-    }
-
-    writeAgentLog({
-      event: 'missing_tool_call_retry_failed',
-      role: context.userRole,
-      tenantId: context.tenantId,
-      productDomain: context.productDomain,
-    })
-
-    return cloneResponseFromText(wrapped, buffered.text)
+    return wrapped
   }
 
   return NextResponse.json({ error: 'Agent stream format unsupported' }, { status: 500 })

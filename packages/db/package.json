@@ -24,7 +24,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/seed.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
@@ -34,7 +33,6 @@
     "pg": "latest"
   },
   "devDependencies": {
-    "better-auth": "^1.5",
     "@types/node": "latest",
     "@types/pg": "latest",
     "drizzle-kit": "latest",

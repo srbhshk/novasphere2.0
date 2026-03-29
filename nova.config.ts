@@ -15,7 +15,7 @@
 export const novaConfig = {
   product: {
     // The name of the product this dashboard is deployed in
-    name: 'novasphere Demo',
+    name: 'Novasphere Demo',
 
     // Short domain identifier — used to select terminology
     // Examples: 'infrastructure' | 'fintech' | 'healthcare' | 'saas'
@@ -64,8 +64,10 @@ export const novaConfig = {
     // Display name of the AI copilot
     name: 'Nova',
     avatarEmoji: '◆',
-    // Default local model — runs offline via Ollama
-    ollamaModel: 'qwen2.5:7b-instruct',
+    // Documented quality default — override with OLLAMA_MODEL env (see .env.example).
+    ollamaModel: 'qwen2.5:0.5b',
+    /** Used when `AI_LATENCY_PROFILE=responsive` (overridden by `OLLAMA_MODEL_FAST` env). */
+    ollamaModelFast: 'qwen2.5:3b-instruct',
     // Show which AI engine is running in the CopilotPanel
     showAdapterStatus: true,
   },

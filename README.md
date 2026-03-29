@@ -44,7 +44,7 @@ docker compose up
 - App: [http://localhost:3000](http://localhost:3000)
 - Ollama API (host): [http://localhost:11434](http://localhost:11434)
 
-**First run:** the Ollama service pulls `qwen2.5:0.5b` (~400MB). **Later runs** reuse the `ollama_models` volume.
+**First run:** the Ollama service pulls `qwen2.5:0.5b` (fast demo default). **Later runs** reuse the `ollama_models` volume. For heavier quality, set `OLLAMA_MODEL` (e.g. `qwen2.5:7b-instruct`) and adjust the compose entrypoint pull.
 
 **Compose notes (see `docker-compose.yml`):**
 
@@ -95,7 +95,7 @@ Edit `apps/web/.env.local`. Minimum for local dev:
 | `BETTER_AUTH_URL`     | Same as `NEXT_PUBLIC_APP_URL`                              |
 | `DATABASE_URL`        | `file:./dev.db` (relative to `apps/web` when running Next) |
 | `OLLAMA_BASE_URL`     | `http://localhost:11434`                                   |
-| `OLLAMA_MODEL`        | `qwen2.5:0.5b`                                             |
+| `OLLAMA_MODEL`        | `qwen2.5:0.5b` (or larger, e.g. `qwen2.5:7b-instruct`)     |
 
 Optional: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` for cloud models (wired in app code per project setup). `NEXT_PUBLIC_DATA_SOURCE` can be `mock` or `api`.
 

@@ -6,7 +6,6 @@ import * as React from 'react'
 import type { SuggestionChip } from '@novasphere/agent-core'
 import type { CopilotPanelProps } from '@novasphere/ui-agent'
 
-import { DEFAULT_OLLAMA_MODEL } from '@/lib/agent/ollama-defaults'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { novaConfig } from 'nova.config'
 import { useCopilotChat } from './CopilotContext'
@@ -48,13 +47,34 @@ export default function CopilotDock(): React.JSX.Element {
   const downloadProgress = useAgentPanelStore((s) => s.downloadProgress)
   const setOpen = useAgentPanelStore((s) => s.setOpen)
 
-  const { messages, sendMessage, status } = useCopilotChat()
+  const { messages, sendMessage, status, stop } = useCopilotChat()
 
   const chatBusy = status === 'streaming' || status === 'submitted'
   const isLoading = chatBusy
 
+  const pendingSendRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (status !== 'ready' || pendingSendRef.current == null) return
+    const text = pendingSendRef.current
+    pendingSendRef.current = null
+    sendMessage({ text })
+  }, [sendMessage, status])
+
+  const queueOrSend = React.useCallback(
+    (text: string) => {
+      if (status === 'ready') {
+        sendMessage({ text })
+        return
+      }
+      pendingSendRef.current = text
+    },
+    [sendMessage, status],
+  )
+
   const normalizedMessages = React.useMemo(() => {
     return messages.map((m) => {
+      // Safety: AI SDK messages are object values; we narrow keys defensively below.
       const msg = m as unknown as Record<string, unknown>
       const parts = msg['parts'] ?? []
       const role = msg['role'] ?? 'user'
@@ -75,12 +95,14 @@ export default function CopilotDock(): React.JSX.Element {
         ? parts
             .filter((p) => p && typeof p === 'object')
             .map((p) => {
+              // Safety: guarded by object checks before property reads.
               const part = p as Record<string, unknown>
               const type = part['type']
               if (typeof type === 'string' && type.startsWith('tool-')) {
                 return {
                   id: (part['toolCallId'] as string) ?? 'tc',
                   toolName: type.slice(5),
+                  // Safety: tool args payload is expected to be a plain object map.
                   args: (part['args'] as Record<string, unknown>) ?? {},
                   result: part['output'],
                 }
@@ -104,6 +126,7 @@ export default function CopilotDock(): React.JSX.Element {
   const streamingContent = React.useMemo(() => {
     const last = messages[messages.length - 1]
     if (!last || typeof last !== 'object') return undefined
+    // Safety: last message is object-like in AI SDK payloads.
     const m = last as unknown as Record<string, unknown>
     if (m['role'] !== 'assistant') return undefined
     const parts = m['parts']
@@ -118,29 +141,23 @@ export default function CopilotDock(): React.JSX.Element {
     return sanitizeStreamingText(raw)
   }, [messages])
 
-  const panelWidth = 380
-
   return (
     <div className="pointer-events-none fixed right-4 bottom-4 z-40">
       <div
-        className="pointer-events-auto"
-        style={
-          isOpen
-            ? {
-                width: `${panelWidth}px`,
-                height: '70dvh',
-                maxHeight: '560px',
-              }
-            : undefined
-        }
+        className={`pointer-events-auto ${
+          isOpen ? 'h-[70dvh] max-h-[560px] w-[var(--ns-copilot-width)]' : ''
+        }`}
       >
         <CopilotPanelNoSsr
           messages={normalizedMessages}
           isLoading={isLoading}
+          lockInputWhileBusy={false}
+          allowSendWhileBusy
+          onStop={stop}
           {...(streamingContent != null ? { streamingContent } : {})}
           suggestions={suggestions}
           adapterType={adapterType ?? 'ollama'}
-          adapterModel={adapterModel ?? DEFAULT_OLLAMA_MODEL}
+          adapterModel={adapterModel}
           adapterStatus={
             status === 'streaming'
               ? 'streaming'
@@ -149,11 +166,9 @@ export default function CopilotDock(): React.JSX.Element {
                 : adapterStatus
           }
           downloadProgress={downloadProgress}
-          onSend={(text: string) => {
-            sendMessage({ text })
-          }}
+          onSend={queueOrSend}
           onSuggestionSelect={(chip: SuggestionChip) => {
-            sendMessage({ text: chip.action })
+            queueOrSend(chip.action)
             setSuggestions([])
           }}
           isOpen={isOpen}

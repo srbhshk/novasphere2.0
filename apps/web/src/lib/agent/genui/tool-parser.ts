@@ -1,45 +1,31 @@
+import type { GenUiToolName } from './tools'
 import { toolInputSchemas } from './tools'
 
 type ToolCallPart = {
   toolCallId: string
-  toolName: ToolName
+  toolName: GenUiToolName
   args: Record<string, unknown>
 }
-
-type ToolName =
-  | 'render_layout'
-  | 'render_component'
-  | 'explain_anomaly'
-  | 'filter_by_relevance'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function parseToolName(typeValue: unknown): ToolName | null {
+function parseToolName(typeValue: unknown): GenUiToolName | null {
   if (typeof typeValue !== 'string' || !typeValue.startsWith('tool-')) {
     return null
   }
   const name = typeValue.slice(5)
-  if (
-    name === 'render_layout' ||
-    name === 'render_component' ||
-    name === 'explain_anomaly' ||
-    name === 'filter_by_relevance'
-  ) {
-    return name
+  if (name in toolInputSchemas) {
+    return name as GenUiToolName
   }
   return null
 }
 
-const TOOL_SCHEMA_BY_NAME: Record<ToolName, (typeof toolInputSchemas)[ToolName]> = {
-  render_layout: toolInputSchemas.render_layout,
-  render_component: toolInputSchemas.render_component,
-  explain_anomaly: toolInputSchemas.explain_anomaly,
-  filter_by_relevance: toolInputSchemas.filter_by_relevance,
-}
-
-export function extractToolCalls(message: Record<string, unknown>): ToolCallPart[] {
+function collectToolParts(
+  message: Record<string, unknown>,
+  executionOnly: boolean,
+): ToolCallPart[] {
   const parts = message['parts']
   if (!Array.isArray(parts)) return []
 
@@ -50,7 +36,11 @@ export function extractToolCalls(message: Record<string, unknown>): ToolCallPart
     if (toolName == null) continue
 
     const state = part['state']
-    if (state !== 'output-available' && state !== 'input-available') continue
+    if (executionOnly) {
+      if (state !== 'output-available') continue
+    } else if (state !== 'output-available' && state !== 'input-available') {
+      continue
+    }
 
     const rawArgsCandidate = part['args'] ?? part['input'] ?? part['output']
     if (!isRecord(rawArgsCandidate)) continue
@@ -68,11 +58,26 @@ export function extractToolCalls(message: Record<string, unknown>): ToolCallPart
   return results
 }
 
+/** Tool parts in any streamable state (for UI that shows in-flight tools). */
+export function extractToolCalls(message: Record<string, unknown>): ToolCallPart[] {
+  return collectToolParts(message, false)
+}
+
+/**
+ * Only finalized tool outputs — use this before `executeToolCall` so
+ * `input-available` partials are not applied and `output-available` is not skipped by dedupe.
+ */
+export function extractToolCallsForExecution(
+  message: Record<string, unknown>,
+): ToolCallPart[] {
+  return collectToolParts(message, true)
+}
+
 export function extractAndValidateToolCalls(
   message: Record<string, unknown>,
 ): ToolCallPart[] {
-  return extractToolCalls(message).flatMap((toolCall) => {
-    const schema = TOOL_SCHEMA_BY_NAME[toolCall.toolName]
+  return extractToolCallsForExecution(message).flatMap((toolCall) => {
+    const schema = toolInputSchemas[toolCall.toolName]
     const parsed = schema.safeParse(toolCall.args)
     if (!parsed.success) {
       return []

@@ -12,7 +12,7 @@ import type {
   PipelineDeal,
   ChurnRisk,
   PipelineDealStage,
-} from '@/mocks/mock.types'
+} from '@/lib/api/contracts'
 import { ModuleWrapper } from './ModuleWrapper'
 
 function formatCurrency(value: number): string {

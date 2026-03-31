@@ -10,7 +10,10 @@ import { z } from 'zod'
 import { env } from '@/lib/env'
 import { getActiveModel } from './models'
 import { genUiTools } from './genui/tools'
-import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
+import {
+  writeAgentDebugLogWithFileSink,
+  writeAgentLogWithFileSink,
+} from '@/lib/agent/observability-server'
 import { novaConfig } from 'nova.config'
 
 export const callOptionsSchema = z.object({
@@ -222,6 +225,18 @@ class NovaToolLoopAgent {
         forceRenderLayoutRetry: input.forceRenderLayoutRetry === true,
       },
     )
+
+    if (env.DEBUG_AGENT) {
+      writeAgentDebugLogWithFileSink({
+        event: 'agent_debug_system_prompt',
+        userId: input.options.userId,
+        role: input.options.userRole,
+        tenantId: input.options.tenantId,
+        productDomain: input.options.productDomain,
+        system,
+        maxSteps,
+      })
+    }
 
     writeAgentLogWithFileSink({
       event: 'agent_turn_start',

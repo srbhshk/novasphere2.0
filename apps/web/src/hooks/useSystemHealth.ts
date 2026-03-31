@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { EngineerMetricsResponse, SystemAlert } from '@/mocks/mock.types'
+import type { EngineerMetricsResponse, SystemAlert } from '@/lib/api/contracts'
 import type { AgentRole } from './useCurrentRole'
 
 type SystemHealthResponse = Pick<

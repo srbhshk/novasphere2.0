@@ -33,6 +33,9 @@ export type {
 export type { AgentContext, BentoCardConfig } from './context.types'
 export type { ProductConfig, RoleContext } from './product.types'
 
+export { MODULE_VOCABULARY_LINES, VALID_MODULE_IDS } from './module-vocabulary'
+export type { ValidModuleId } from './module-vocabulary'
+
 export {
   AgentCapabilityError,
   AgentError,
@@ -52,6 +55,8 @@ export {
   buildInitialLayoutRoleHint,
   buildToolLoopInstructions,
   classifyUiIntent,
+  getOffTopicSystemPrompt,
+  getRelevanceGatePrompt,
   getAnomalyPrompt,
   getIntentPrompt,
   getLayoutPrompt,

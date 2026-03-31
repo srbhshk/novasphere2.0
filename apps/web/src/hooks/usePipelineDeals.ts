@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PaginatedResponse, PipelineDeal } from '@/mocks/mock.types'
+import type { PaginatedResponse, PipelineDeal } from '@/lib/api/contracts'
 import type { AgentRole } from './useCurrentRole'
 
 type PipelineParams = {

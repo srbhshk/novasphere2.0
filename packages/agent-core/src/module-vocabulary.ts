@@ -1,0 +1,41 @@
+export const VALID_MODULE_IDS = [
+  'metric-mrr',
+  'metric-arr',
+  'metric-nrr',
+  'metric-churn',
+  'metric-arpu',
+  'metric-ltv',
+  'metric-conversion',
+  'metric-users',
+  'metric-new-signups',
+  'metric-active-orgs',
+  'metric-api-latency',
+  'metric-error-rate',
+  'metric-uptime',
+  'metric-request-volume',
+  'chart-revenue',
+  'chart-revenue-comparison',
+  'chart-churn-trend',
+  'chart-user-growth',
+  'chart-top-customers',
+  'chart-pipeline',
+  'chart-plan-distribution',
+  'chart-feature-adoption',
+  'chart-response-time',
+  'chart-error-breakdown',
+  'chart-activity',
+  'chart-sparkline',
+  'customer-table',
+  'pipeline-table',
+  'activity-feed',
+  'deployment-log',
+  'system-alerts',
+  'anomaly-banner',
+] as const
+
+export type ValidModuleId = (typeof VALID_MODULE_IDS)[number]
+
+export const MODULE_VOCABULARY_LINES: string[] = [
+  'Available moduleIds (use exact strings):',
+  ...VALID_MODULE_IDS.map((id) => `- ${id}`),
+]

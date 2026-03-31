@@ -14,7 +14,7 @@ import type {
   CeoMetricsResponse,
   EngineerMetricsResponse,
   AdminMetricsResponse,
-} from '@/mocks/mock.types'
+} from '@/lib/api/contracts'
 import { ModuleWrapper } from './ModuleWrapper'
 
 // --- CEO chart modules ---

@@ -24,3 +24,11 @@ export function writeAgentLogWithFileSink(payload: Record<string, unknown>): voi
     // Sink failures must not break agent requests.
   }
 }
+
+/**
+ * DEBUG-only log line to stdout (and optional sink).
+ * Caller is responsible for checking env.DEBUG_AGENT.
+ */
+export function writeAgentDebugLogWithFileSink(payload: Record<string, unknown>): void {
+  writeAgentLogWithFileSink({ level: 'debug', ...payload })
+}

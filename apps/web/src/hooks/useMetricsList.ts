@@ -1,15 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { HeatmapCell } from '@novasphere/ui-charts'
-import type { KpiMetric } from '@/mocks/mock.types'
-import {
-  MOCK_MRR,
-  MOCK_CHURN,
-  MOCK_ACTIVE_USERS,
-  MOCK_ACTIVITY_HEATMAP,
-  MOCK_SPARKLINE_DATA,
-  MOCK_REVENUE_HISTORY,
-  MOCK_PIPELINE_STAGES,
-} from '@/mocks/metrics.mock'
+import type { KpiMetric } from '@/lib/api/contracts'
 
 export type MetricsListResult = {
   mrr: {
@@ -40,11 +31,14 @@ function findKpi(kpis: KpiMetric[], id: string): KpiMetric | undefined {
   return kpis.find((k) => k.id === id)
 }
 
-function kpiToMetric(
-  kpi: KpiMetric | undefined,
-  fallback: MetricsListResult['mrr'],
-): MetricsListResult['mrr'] {
-  if (kpi == null) return fallback
+function kpiToMetric(kpi: KpiMetric | undefined): MetricsListResult['mrr'] {
+  if (kpi == null) {
+    return {
+      value: 0,
+      trend: 0,
+      deltaDirection: 'flat',
+    }
+  }
   const dir =
     kpi.deltaDirection === 'up' ? 'up' : kpi.deltaDirection === 'down' ? 'down' : 'flat'
   return {
@@ -66,19 +60,18 @@ async function fetchMetrics(role: string): Promise<MetricsListResult> {
 
   const revenueHistory = Array.isArray(data['revenueHistory'])
     ? (data['revenueHistory'] as MetricsListResult['revenueHistory'])
-    : MOCK_REVENUE_HISTORY
+    : []
   const pipelineStages = Array.isArray(data['pipelineByStage'])
     ? (data['pipelineByStage'] as MetricsListResult['pipelineStages'])
-    : MOCK_PIPELINE_STAGES
+    : []
   const activityHeatmap = Array.isArray(data['activityHeatmap'])
     ? (data['activityHeatmap'] as MetricsListResult['activityHeatmap'])
-    : MOCK_ACTIVITY_HEATMAP
+    : []
 
-  const mrr = kpiToMetric(findKpi(kpis, 'mrr'), MOCK_MRR)
-  const churn = kpiToMetric(findKpi(kpis, 'churn'), MOCK_CHURN)
+  const mrr = kpiToMetric(findKpi(kpis, 'mrr'))
+  const churn = kpiToMetric(findKpi(kpis, 'churn'))
   const activeUsers = kpiToMetric(
     findKpi(kpis, 'total-users') ?? findKpi(kpis, 'active-users'),
-    MOCK_ACTIVE_USERS,
   )
   const sparklineFromKpi = findKpi(kpis, 'mrr')?.sparkline
   const sparklineData = Array.isArray(sparklineFromKpi)
@@ -86,7 +79,7 @@ async function fetchMetrics(role: string): Promise<MetricsListResult> {
         value,
         label: `${index + 1}`,
       }))
-    : MOCK_SPARKLINE_DATA
+    : []
 
   return {
     mrr,

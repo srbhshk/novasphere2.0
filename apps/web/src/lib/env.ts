@@ -18,6 +18,11 @@ const serverSchema = z.object({
   /** Single LLM turn budget (streamText `timeout` + abort coalescing). */
   AGENT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   /**
+   * When true, emit full-fidelity agent debug logs to stdout.
+   * WARNING: includes full system prompts and untrimmed user content.
+   */
+  DEBUG_AGENT: z.coerce.boolean().default(false),
+  /**
    * `quality` — env OLLAMA_MODEL / cloud defaults.
    * `responsive` — prefer `OLLAMA_MODEL_FAST` or nova.config `agent.ollamaModelFast` on Ollama.
    */
@@ -58,6 +63,7 @@ export const {
   OPENAI_API_KEY,
   AI_PROVIDER,
   AGENT_TURN_TIMEOUT_MS,
+  DEBUG_AGENT,
   AI_LATENCY_PROFILE,
   OLLAMA_MODEL_FAST,
   RATE_LIMIT_AGENT_RPM,

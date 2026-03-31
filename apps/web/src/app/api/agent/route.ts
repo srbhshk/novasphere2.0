@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server'
 import { convertToModelMessages } from 'ai'
+import { generateText, stepCountIs, streamText } from 'ai'
 import { z } from 'zod'
 import { headers } from 'next/headers'
 import { buildAgentContext } from '@/lib/agent/context-builder'
 import { detectLayoutIntent, novaAgent } from '@/lib/agent/nova-agent'
 import { genUiTools } from '@/lib/agent/genui/tools'
-import { writeAgentLogWithFileSink } from '@/lib/agent/observability-server'
+import {
+  writeAgentDebugLogWithFileSink,
+  writeAgentLogWithFileSink,
+} from '@/lib/agent/observability-server'
 import { createAuth } from '@/lib/auth/auth'
 import { env } from '@/lib/env'
+import { getActiveModel } from '@/lib/agent/models'
 import { getWarnModeStatus } from './warn-mode'
+import { getOffTopicSystemPrompt, getRelevanceGatePrompt } from '@novasphere/agent-core'
 
 /** Serverless ceiling; keep above `AGENT_TURN_TIMEOUT_MS` + buffer. */
 export const maxDuration = 180
@@ -21,11 +27,66 @@ type RateWindow = {
 const RATE_WINDOWS = new Map<string, RateWindow>()
 
 const useChatBodySchema = z.object({
-  messages: z.array(z.record(z.string(), z.unknown())),
+  messages: z.array(
+    z
+      .object({
+        role: z.string(),
+        /**
+         * AI SDK v6 UIMessage shape: `{ parts: [{ type: 'text', text: string }, ...] }`.
+         * We accept unknown part shapes and only extract recognized text parts.
+         */
+        parts: z.array(z.record(z.string(), z.unknown())).optional(),
+        /**
+         * Back-compat: older clients may send `content` as a string or array of parts.
+         */
+        content: z.unknown().optional(),
+      })
+      .passthrough(),
+  ),
 })
+
+type UseChatMessage = z.infer<typeof useChatBodySchema>['messages'][number]
+type UseChatPart = Record<string, unknown>
 
 function elapsedMs(startMs: number): number {
   return Date.now() - startMs
+}
+
+function isUseChatPart(value: unknown): value is UseChatPart {
+  return typeof value === 'object' && value !== null
+}
+
+function extractTextFromParts(parts: unknown): string {
+  if (!Array.isArray(parts)) return ''
+  const chunks: string[] = []
+  for (const part of parts) {
+    if (!isUseChatPart(part)) continue
+    if (part['type'] !== 'text') continue
+    const text = part['text']
+    if (typeof text === 'string' && text.length > 0) {
+      chunks.push(text)
+    }
+  }
+  return chunks.join(' ').trim()
+}
+
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) return extractTextFromParts(content)
+  return ''
+}
+
+function pickMessageText(message: UseChatMessage): {
+  text: string
+  source: 'parts' | 'content' | 'none'
+} {
+  const fromParts = extractTextFromParts(message.parts)
+  if (fromParts.length > 0) return { text: fromParts, source: 'parts' }
+
+  const fromContent = extractTextFromContent(message.content)
+  if (fromContent.length > 0) return { text: fromContent, source: 'content' }
+
+  return { text: '', source: 'none' }
 }
 
 function getRateLimitPerMinute(): number {
@@ -64,58 +125,30 @@ function checkRateLimit(key: string): boolean {
   return true
 }
 
-function getLastUserMessage(messages: Array<Record<string, unknown>>): string {
+function getLastUserMessage(messages: UseChatMessage[]): {
+  text: string
+  source: 'parts' | 'content' | 'none'
+} {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
-    if (msg && msg['role'] === 'user') {
-      const content = msg['content']
-      if (typeof content === 'string') return content
-      if (Array.isArray(content)) {
-        const textPart = content.find(
-          (p) =>
-            p &&
-            typeof p === 'object' &&
-            (p as Record<string, unknown>)['type'] === 'text',
-        )
-        const text =
-          textPart && typeof textPart === 'object' && 'text' in textPart
-            ? (textPart as { text: string }).text
-            : undefined
-        if (typeof text === 'string') return text
-      }
-      return ''
+    if (msg && msg.role === 'user') {
+      return pickMessageText(msg)
     }
   }
-  return ''
+  return { text: '', source: 'none' }
 }
 
-function summarizeConversationHistory(messages: Array<Record<string, unknown>>): string {
+function summarizeConversationHistory(messages: UseChatMessage[]): string {
   const recent = messages.slice(-8)
   const summaryLines: string[] = []
 
   for (const message of recent) {
-    const role = message['role']
+    const role = message.role
     if (role !== 'user' && role !== 'assistant') continue
 
-    const content = message['content']
-    if (typeof content === 'string' && content.length > 0) {
-      summaryLines.push(`${role}: ${content}`)
-      continue
-    }
-
-    if (Array.isArray(content)) {
-      const textParts = content
-        .filter(
-          (part): part is Record<string, unknown> =>
-            typeof part === 'object' &&
-            part !== null &&
-            (part as Record<string, unknown>)['type'] === 'text',
-        )
-        .map((part) => part['text'])
-        .filter((text): text is string => typeof text === 'string' && text.length > 0)
-      if (textParts.length > 0) {
-        summaryLines.push(`${role}: ${textParts.join(' ')}`)
-      }
+    const { text } = pickMessageText(message)
+    if (text.length > 0) {
+      summaryLines.push(`${role}: ${text}`)
     }
   }
 
@@ -157,25 +190,35 @@ function normalizeUserRole(
 async function resolveAgentIdentityFromSession(): Promise<{
   userId: string
   role: 'admin' | 'ceo' | 'engineer' | 'viewer'
+  tenantId: string
 }> {
+  function readActiveOrganizationId(value: unknown): string | null {
+    if (!isRecord(value)) return null
+    const inner = value['session']
+    if (!isRecord(inner)) return null
+    const raw = inner['activeOrganizationId']
+    return typeof raw === 'string' && raw.length > 0 ? raw : null
+  }
+
   try {
     const auth = await createAuth()
     const session = await auth.api.getSession({ headers: await headers() })
     if (session == null || !isRecord(session)) {
-      return { userId: 'anonymous', role: 'viewer' }
+      return { userId: 'anonymous', role: 'viewer', tenantId: 'demo' }
     }
 
     const user = session['user']
     if (!isRecord(user)) {
-      return { userId: 'anonymous', role: 'viewer' }
+      return { userId: 'anonymous', role: 'viewer', tenantId: 'demo' }
     }
 
     const idRaw = user['id']
     const userId = typeof idRaw === 'string' && idRaw.length > 0 ? idRaw : 'anonymous'
     const sessionRole = normalizeUserRole(user['role'])
-    return { userId, role: sessionRole ?? 'viewer' }
+    const tenantId = readActiveOrganizationId(session) ?? 'demo'
+    return { userId, role: sessionRole ?? 'viewer', tenantId }
   } catch {
-    return { userId: 'anonymous', role: 'viewer' }
+    return { userId: 'anonymous', role: 'viewer', tenantId: 'demo' }
   }
 }
 
@@ -267,9 +310,11 @@ function wrapResponseWithContractLogging(
     productDomain: string
     warnMode: boolean
     dayIndex: number
+    debugEnabled: boolean
+    turnId: string
   },
 ): Response {
-  if (response.body == null || !contract.requiresTool) {
+  if (response.body == null || (!contract.requiresTool && !contract.debugEnabled)) {
     return response
   }
 
@@ -278,6 +323,7 @@ function wrapResponseWithContractLogging(
   const encoder = new TextEncoder()
   let toolDetected = false
   let carry = ''
+  const debugChunks: string[] = []
 
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -295,16 +341,35 @@ function wrapResponseWithContractLogging(
           productDomain: contract.productDomain,
           mode: contract.warnMode ? 'warn' : 'enforce',
           dayIndex: contract.dayIndex,
+          turnId: contract.turnId,
         }
         if (!toolDetected) {
-          writeAgentLogWithFileSink({
-            event: 'contract_violation',
-            ...base,
-          })
+          if (contract.requiresTool) {
+            writeAgentLogWithFileSink({
+              event: 'contract_violation',
+              ...base,
+            })
+          }
         } else {
-          writeAgentLogWithFileSink({
-            event: 'contract_compliant',
-            ...base,
+          if (contract.requiresTool) {
+            writeAgentLogWithFileSink({
+              event: 'contract_compliant',
+              ...base,
+            })
+          }
+        }
+
+        if (contract.debugEnabled) {
+          if (carry.length > 0) {
+            debugChunks.push(carry)
+          }
+          writeAgentDebugLogWithFileSink({
+            event: 'agent_debug_stream_output_raw',
+            turnId: contract.turnId,
+            role: contract.role,
+            tenantId: contract.tenantId,
+            productDomain: contract.productDomain,
+            output: debugChunks.join(''),
           })
         }
         controller.close()
@@ -312,6 +377,9 @@ function wrapResponseWithContractLogging(
       }
       if (value) {
         const text = decoder.decode(value, { stream: true })
+        if (contract.debugEnabled) {
+          debugChunks.push(text)
+        }
 
         // Preserve only a small tail to handle split lines across chunks.
         const combined = carry + text
@@ -335,6 +403,47 @@ function wrapResponseWithContractLogging(
     statusText: response.statusText,
     headers: response.headers,
   })
+}
+
+const relevanceDecisionSchema = z
+  .object({
+    inDomain: z.boolean(),
+    reason: z.string(),
+    safeReply: z.string(),
+  })
+  .strict()
+
+async function runRelevanceGate(input: {
+  context: Awaited<ReturnType<typeof buildAgentContext>>
+}): Promise<z.infer<typeof relevanceDecisionSchema> | null> {
+  const { context } = input
+  const model = await getActiveModel()
+
+  const system = getRelevanceGatePrompt({
+    productName: context.productName,
+    productDomain: context.productDomain,
+    productDescription: context.productDescription,
+    roleInProduct: context.roleInProduct,
+    criticalSignals: context.criticalSignals,
+    userMessage: context.userMessage,
+    conversationHistory: context.conversationHistory,
+  })
+
+  const result = await generateText({
+    model,
+    system,
+    prompt: '',
+    stopWhen: stepCountIs(1),
+    timeout: env.AGENT_TURN_TIMEOUT_MS,
+  })
+
+  try {
+    const parsedJson: unknown = JSON.parse(result.text)
+    const parsed = relevanceDecisionSchema.safeParse(parsedJson)
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -363,6 +472,16 @@ export async function POST(request: Request): Promise<Response> {
   if (!useChatParsed.success || useChatParsed.data.messages.length === 0) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
+  if (env.DEBUG_AGENT) {
+    writeAgentDebugLogWithFileSink({
+      event: 'agent_debug_request_body_raw',
+      turnId,
+      userId: identity.userId,
+      role: identity.role,
+      tenantId: identity.tenantId,
+      body: rawBody,
+    })
+  }
   writeAgentLogWithFileSink({
     event: 'agent_timing_request_validated',
     turnId,
@@ -370,12 +489,22 @@ export async function POST(request: Request): Promise<Response> {
   })
 
   // Safety: messages have passed schema validation and are object-like entries.
-  userMessage = getLastUserMessage(
-    useChatParsed.data.messages as Array<Record<string, unknown>>,
-  )
-  conversationHistory = summarizeConversationHistory(
-    useChatParsed.data.messages as Array<Record<string, unknown>>,
-  )
+  const lastUser = getLastUserMessage(useChatParsed.data.messages)
+  userMessage = lastUser.text
+  conversationHistory = summarizeConversationHistory(useChatParsed.data.messages)
+  if (env.DEBUG_AGENT) {
+    writeAgentDebugLogWithFileSink({
+      event: 'agent_debug_user_message_extracted',
+      turnId,
+      userId: identity.userId,
+      role: identity.role,
+      tenantId: identity.tenantId,
+      extracted: {
+        length: userMessage.length,
+        source: lastUser.source,
+      },
+    })
+  }
   // Safety: headers return string|null and the null case is handled by fallback.
   currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
   const canUseConvertedHistory = env.AI_PROVIDER !== 'openai'
@@ -402,6 +531,7 @@ export async function POST(request: Request): Promise<Response> {
   const contextHeaders = new Headers(request.headers)
   contextHeaders.set('x-user-id', identity.userId)
   contextHeaders.set('x-user-role', identity.role)
+  contextHeaders.set('x-tenant-id', identity.tenantId)
   contextHeaders.set('x-turn-id', turnId)
 
   const contextBuildStartMs = Date.now()
@@ -411,12 +541,67 @@ export async function POST(request: Request): Promise<Response> {
     conversationHistory,
     currentRoute,
   })
+  if (env.DEBUG_AGENT) {
+    writeAgentDebugLogWithFileSink({
+      event: 'agent_debug_context_built',
+      turnId,
+      context,
+    })
+  }
   writeAgentLogWithFileSink({
     event: 'agent_timing_context_built',
     turnId,
     contextBuildMs: elapsedMs(contextBuildStartMs),
     totalElapsedMs: elapsedMs(requestStartedAtMs),
   })
+
+  const relevance = await runRelevanceGate({ context })
+  if (relevance && !relevance.inDomain) {
+    writeAgentLogWithFileSink({
+      event: 'agent_relevance_blocked',
+      turnId,
+      tenantId: context.tenantId,
+      role: context.userRole,
+      productDomain: context.productDomain,
+      reason: relevance.reason,
+    })
+    if (env.DEBUG_AGENT) {
+      writeAgentDebugLogWithFileSink({
+        event: 'agent_debug_relevance_decision',
+        turnId,
+        decision: relevance,
+      })
+    }
+
+    const model = await getActiveModel()
+    const system = getOffTopicSystemPrompt({
+      productName: context.productName,
+      productDomain: context.productDomain,
+      productDescription: context.productDescription,
+      roleInProduct: context.roleInProduct,
+    })
+
+    const refusalStream = streamText({
+      model,
+      system,
+      prompt: context.userMessage,
+      stopWhen: stepCountIs(1),
+      timeout: env.AGENT_TURN_TIMEOUT_MS,
+    })
+    const response = refusalStream.toUIMessageStreamResponse()
+    const { warnMode, dayIndex } = getWarnModeStatus()
+    return wrapResponseWithContractLogging(response, {
+      requiresTool: false,
+      intent: 'off_topic',
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+      warnMode,
+      dayIndex,
+      debugEnabled: env.DEBUG_AGENT,
+      turnId,
+    })
+  }
 
   const isLayoutIntent = detectLayoutIntent(userMessage)
   const streamStartMs = Date.now()
@@ -466,6 +651,8 @@ export async function POST(request: Request): Promise<Response> {
       productDomain: context.productDomain,
       warnMode,
       dayIndex,
+      debugEnabled: env.DEBUG_AGENT,
+      turnId,
     })
 
     writeAgentLogWithFileSink({

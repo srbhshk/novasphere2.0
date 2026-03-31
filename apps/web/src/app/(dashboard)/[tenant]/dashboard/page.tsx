@@ -5,7 +5,6 @@ import { X } from 'lucide-react'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
 import { GlassCard, Skeleton, Button, Badge } from '@novasphere/ui-glass'
-import { useMetricsList } from '@/hooks/useMetricsList'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
@@ -21,7 +20,9 @@ import {
   requiresToolForIntent,
 } from '@novasphere/agent-core'
 import type { AdapterType } from '@novasphere/agent-core'
-import type { MetricsListResult } from '@/hooks/useMetricsList'
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
+import type { AgentRole } from '@/hooks/useCurrentRole'
+import type { KpiMetric } from '@/lib/api/contracts'
 import { useCopilotChat } from '../../CopilotContext'
 import DashboardErrorBoundary from '../../DashboardErrorBoundary'
 
@@ -364,18 +365,31 @@ function getDefaultLayoutForRole(role: string): BentoLayoutConfig {
 }
 
 function getFirstAnomalousMetric(
-  metrics: MetricsListResult,
+  role: AgentRole,
+  kpis: KpiMetric[],
 ): { metricLabel: string; value: number } | null {
-  if (metrics.churn.anomaly === true) {
-    return { metricLabel: 'Churn', value: metrics.churn.value }
+  const anomalies = kpis.filter((k) => k.anomaly === true)
+  if (anomalies.length === 0) return null
+
+  const rolePriority: ReadonlyArray<string> =
+    role === 'engineer'
+      ? ['api-latency-p99', 'error-rate', 'api-latency-p50', 'uptime', 'request-volume']
+      : role === 'admin'
+        ? ['new-signups', 'active-orgs', 'total-users', 'mrr', 'conversion']
+        : role === 'viewer'
+          ? ['mrr', 'active-users', 'total-users']
+          : ['churn', 'mrr', 'nrr', 'arr', 'conversion']
+
+  const byId = new Map(anomalies.map((k) => [k.id, k]))
+  for (const id of rolePriority) {
+    const found = byId.get(id)
+    if (found) {
+      return { metricLabel: found.label, value: found.value }
+    }
   }
-  if (metrics.mrr.anomaly === true) {
-    return { metricLabel: 'MRR', value: metrics.mrr.value }
-  }
-  if (metrics.activeUsers.anomaly === true) {
-    return { metricLabel: 'Active Users', value: metrics.activeUsers.value }
-  }
-  return null
+
+  const fallback = anomalies[0]
+  return fallback ? { metricLabel: fallback.label, value: fallback.value } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -404,12 +418,14 @@ export default function DashboardPage(): React.JSX.Element {
   const { messages, sendMessage, status } = useCopilotChat()
   const chatBusy = status === 'streaming' || status === 'submitted'
 
-  // Use legacy hook for anomaly detection only (role-scoped data via useDashboardMetrics in modules)
-  const { data: metricsData, isPending: metricsPending } = useMetricsList(agentRole)
-  const anomalyMetric = useMemo(
-    () => (metricsData != null ? getFirstAnomalousMetric(metricsData) : null),
-    [metricsData],
+  const { data: metricsData, isLoading: metricsPending } = useDashboardMetrics(
+    agentRole,
+    authSession != null,
   )
+  const anomalyMetric = useMemo(() => {
+    const kpis = (metricsData as { kpis?: KpiMetric[] } | undefined)?.kpis
+    return Array.isArray(kpis) ? getFirstAnomalousMetric(agentRole, kpis) : null
+  }, [agentRole, metricsData])
   const setCopilotOpen = useAgentPanelStore((s) => s.setOpen)
 
   const shouldShowSignalToast =

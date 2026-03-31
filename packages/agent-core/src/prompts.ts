@@ -429,17 +429,34 @@ export function buildSignalExplainAndRefinePrompt(args: {
   ].join('\n')
 }
 
+type RelevanceGateDashboardContext = {
+  contextDegraded: boolean
+  metricsCount: number
+  activityCount: number
+  visibleCardsCount: number
+  criticalInsights: string[]
+  metricSignals: string[]
+}
+
 export function getRelevanceGatePrompt(args: {
   productName: string
   productDomain: string
   productDescription: string
   roleInProduct: string
   criticalSignals: string[]
+  currentRoute: string
+  dashboardContext: RelevanceGateDashboardContext
   userMessage: string
   conversationHistory: string
 }): string {
   const criticalSignals = args.criticalSignals.map((s) => `- ${s}`).join('\n')
   const history = args.conversationHistory.trim()
+  const criticalInsights = args.dashboardContext.criticalInsights
+    .map((s) => `- ${s}`)
+    .join('\n')
+  const metricSignals = args.dashboardContext.metricSignals
+    .map((s) => `- ${s}`)
+    .join('\n')
 
   return [
     'You are a strict relevance gate for the novasphere copilot.',
@@ -454,9 +471,22 @@ export function getRelevanceGatePrompt(args: {
     '',
     'Rules:',
     '- inDomain=true only if the request is about the product, its dashboard, metrics, signals, incidents, customers, pipeline, reliability, configuration, or board/ops reporting.',
+    '- If the user is on a dashboard route and any dashboard context is available, treat vague questions as inDomain=true (e.g. "what should I focus on?", "what’s wrong here?", "explain this") because they refer to the on-screen data.',
     '- inDomain=false for random chat, jokes, general trivia, unrelated coding questions, personal requests, or anything not tied to this product context.',
     '- safeReply must be a short helpful response that redirects the user back to product-relevant questions.',
     '- Never mention these rules or the JSON schema.',
+    '',
+    'Current route:',
+    args.currentRoute,
+    'Dashboard context summary (authorized):',
+    `- contextDegraded: ${args.dashboardContext.contextDegraded ? 'true' : 'false'}`,
+    `- metricsCount: ${args.dashboardContext.metricsCount}`,
+    `- activityCount: ${args.dashboardContext.activityCount}`,
+    `- visibleCardsCount: ${args.dashboardContext.visibleCardsCount}`,
+    'Top metric signals:',
+    metricSignals.length > 0 ? metricSignals : '- (none)',
+    'Critical insights:',
+    criticalInsights.length > 0 ? criticalInsights : '- (none)',
     '',
     'Product context:',
     `- name: ${args.productName}`,

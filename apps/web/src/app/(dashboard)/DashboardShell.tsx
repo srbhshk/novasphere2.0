@@ -18,6 +18,7 @@ import { useLayoutStore } from '@/store/layout.store'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
 import { CopilotChatProvider } from './CopilotContext'
 import CopilotDock from './CopilotDock'
+import CopilotCoachmark from './CopilotCoachmark'
 
 type DashboardShellProps = {
   tenant: TenantConfig
@@ -153,6 +154,7 @@ export default function DashboardShell({
             {children}
           </div>
           <CopilotDock />
+          <CopilotCoachmark isCopilotOpen={isCopilotOpen} />
         </AppShell>
       </CopilotChatProvider>
     </AuthGuard>

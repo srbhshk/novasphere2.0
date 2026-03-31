@@ -413,10 +413,21 @@ const relevanceDecisionSchema = z
   })
   .strict()
 
+function formatMetricSignal(
+  metric: Awaited<ReturnType<typeof buildAgentContext>>['activeMetrics'][number],
+): string {
+  const hasUnit = metric.unit != null && metric.unit.length > 0
+  const value = hasUnit ? `${metric.value}${metric.unit}` : `${metric.value}`
+  const deltaPrefix = metric.delta > 0 ? '+' : ''
+  const anomalyTag = metric.anomaly === true ? ' [ANOMALY]' : ''
+  return `${metric.label}: ${value} (${deltaPrefix}${metric.delta}%, ${metric.deltaDirection})${anomalyTag}`
+}
+
 async function runRelevanceGate(input: {
   context: Awaited<ReturnType<typeof buildAgentContext>>
+  turnId: string
 }): Promise<z.infer<typeof relevanceDecisionSchema> | null> {
-  const { context } = input
+  const { context, turnId } = input
   const model = await getActiveModel()
 
   const system = getRelevanceGatePrompt({
@@ -425,9 +436,28 @@ async function runRelevanceGate(input: {
     productDescription: context.productDescription,
     roleInProduct: context.roleInProduct,
     criticalSignals: context.criticalSignals,
+    currentRoute: context.currentRoute,
+    dashboardContext: {
+      contextDegraded: context.uiContractResult?.status === 'warn_violation',
+      metricsCount: context.activeMetrics.length,
+      activityCount: context.recentActivity.length,
+      visibleCardsCount: context.visibleCards.length,
+      criticalInsights: (context.criticalInsights ?? []).slice(0, 5),
+      metricSignals: context.activeMetrics.slice(0, 4).map(formatMetricSignal),
+    },
     userMessage: context.userMessage,
     conversationHistory: context.conversationHistory,
   })
+  if (env.DEBUG_AGENT) {
+    writeAgentDebugLogWithFileSink({
+      event: 'agent_debug_relevance_gate_prompt',
+      turnId,
+      role: context.userRole,
+      tenantId: context.tenantId,
+      productDomain: context.productDomain,
+      system,
+    })
+  }
 
   const result = await generateText({
     model,
@@ -555,7 +585,7 @@ export async function POST(request: Request): Promise<Response> {
     totalElapsedMs: elapsedMs(requestStartedAtMs),
   })
 
-  const relevance = await runRelevanceGate({ context })
+  const relevance = await runRelevanceGate({ context, turnId })
   if (relevance && !relevance.inDomain) {
     writeAgentLogWithFileSink({
       event: 'agent_relevance_blocked',

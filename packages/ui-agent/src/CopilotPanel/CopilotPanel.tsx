@@ -185,11 +185,12 @@ export function CopilotPanel({
         onClick={() => onOpenChange(true)}
         className={cn(
           [
-            'group relative rounded-2xl border border-[var(--ns-color-border)] p-3',
-            'bg-[radial-gradient(80%_80%_at_30%_20%,var(--ns-color-accent-10),transparent_60%),linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
-            'shadow-[0_18px_50px_rgba(0,0,0,0.45)]',
+            // Primary FAB pill (high contrast; noticeable without animation)
+            'group relative inline-flex items-center gap-2.5 rounded-full border border-[var(--ns-color-border)] px-4 py-3',
+            'bg-[radial-gradient(90%_120%_at_20%_20%,var(--ns-color-accent-20),transparent_58%),linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
+            'shadow-[0_18px_55px_rgba(0,0,0,0.55)]',
             'transition-all duration-200',
-            'hover:-translate-y-0.5 hover:shadow-[0_22px_70px_rgba(0,0,0,0.55)]',
+            'hover:-translate-y-0.5 hover:shadow-[0_24px_80px_rgba(0,0,0,0.6)]',
             'active:translate-y-0 active:shadow-[0_12px_40px_rgba(0,0,0,0.45)]',
             'focus-visible:ring-2 focus-visible:ring-[var(--ns-color-accent)]/50 focus-visible:outline-none',
           ].join(' '),
@@ -211,10 +212,33 @@ export function CopilotPanel({
               },
             })}
       >
+        {/* Glow plate (static; visible even when motion disabled) */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1 rounded-full bg-[radial-gradient(60%_60%_at_50%_50%,var(--ns-color-accent-20),transparent_70%)] opacity-70 blur-md transition-opacity duration-200 group-hover:opacity-95"
+        />
         <div className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(70%_70%_at_50%_0%,rgba(255,255,255,0.12),transparent_60%)]" />
         </div>
-        <Bot className="relative h-5 w-5 text-[var(--ns-color-text)]" />
+
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ns-color-accent)] shadow-[0_0_0_6px_var(--ns-color-accent-10)]">
+          <Bot className="h-4.5 w-4.5 text-[color:var(--ns-color-bg)]" />
+        </span>
+
+        {/* <span className="relative flex min-w-0 flex-col items-start leading-none">
+          <span className="text-sm font-semibold tracking-wide text-[var(--ns-color-text)]">
+            {label}
+          </span>
+          <span className="text-[11px] tracking-wide text-[var(--ns-color-muted)]">
+            Explain, refine, prioritize
+          </span>
+        </span> */}
+
+        {/* Attention dot (motion-safe only) */}
+        <span
+          aria-hidden="true"
+          className="relative h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[var(--ns-color-accent)] shadow-[0_0_16px_var(--ns-glow-accent)] motion-safe:animate-pulse motion-reduce:animate-none"
+        />
       </motion.button>
     )
   }

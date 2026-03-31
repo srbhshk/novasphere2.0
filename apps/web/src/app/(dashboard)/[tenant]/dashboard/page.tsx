@@ -364,6 +364,98 @@ function getDefaultLayoutForRole(role: string): BentoLayoutConfig {
   return VIEWER_DEFAULT_LAYOUT
 }
 
+function getRoleAwareFallbackSuggestions(role: AgentRole): SuggestionChip[] {
+  if (role === 'engineer') {
+    return [
+      {
+        id: 'eng-reliability',
+        label: 'Prioritize reliability first',
+        action:
+          'Prioritize error rate, latency, uptime, and unresolved alerts first while keeping the current layout mostly stable.',
+      },
+      {
+        id: 'eng-incidents',
+        label: 'Investigate current incident risks',
+        action:
+          'Focus on current incident risk signals and explain likely root-cause areas using the visible system and deployment data.',
+      },
+      {
+        id: 'eng-balance',
+        label: 'Balance stability and throughput',
+        action:
+          'Balance stability and throughput signals, then recommend the next two engineering priorities from the visible dashboard context.',
+      },
+    ]
+  }
+
+  if (role === 'ceo') {
+    return [
+      {
+        id: 'ceo-board',
+        label: 'Board-level focus',
+        action:
+          'Prioritize board-level signals first: revenue growth, churn, and pipeline health, with concise risk and opportunity highlights.',
+      },
+      {
+        id: 'ceo-growth-risk',
+        label: 'Balance growth and risk',
+        action:
+          'Balance growth opportunities and downside risks from the visible metrics, and recommend what leadership should focus on this week.',
+      },
+      {
+        id: 'ceo-minimal',
+        label: 'Keep changes minimal',
+        action:
+          'Keep visual changes minimal and explain which executive signals matter most right now and why.',
+      },
+    ]
+  }
+
+  if (role === 'admin') {
+    return [
+      {
+        id: 'admin-platform',
+        label: 'Platform health first',
+        action:
+          'Prioritize platform health, tenant operations, and policy-related signals while keeping the current layout mostly stable.',
+      },
+      {
+        id: 'admin-ops',
+        label: 'Focus operational priorities',
+        action:
+          'Focus on operational bottlenecks visible in onboarding, access, and system signals, then suggest immediate next priorities.',
+      },
+      {
+        id: 'admin-balance',
+        label: 'Balance ops and growth',
+        action:
+          'Balance operational reliability and growth signals from the visible data, and explain what should be monitored most closely next.',
+      },
+    ]
+  }
+
+  return [
+    {
+      id: 'viewer-summary',
+      label: 'What matters right now',
+      action:
+        'Summarize what matters most right now from the visible dashboard signals in clear, concise language.',
+    },
+    {
+      id: 'viewer-risks',
+      label: 'Summarize top risks',
+      action:
+        'Summarize the top current risks and trends from the visible data, with a short explanation of likely impact.',
+    },
+    {
+      id: 'viewer-minimal',
+      label: 'Keep layout stable',
+      action:
+        'Keep layout changes minimal and explain which visible signals should get the most attention next.',
+    },
+  ]
+}
+
 function getFirstAnomalousMetric(
   role: AgentRole,
   kpis: KpiMetric[],
@@ -616,25 +708,8 @@ export default function DashboardPage(): React.JSX.Element {
     if (!requiresToolForIntent(intent)) return
     if (suggestions.length > 0) return
 
-    const fallbackSuggestions: SuggestionChip[] = [
-      {
-        id: 'clarify-focus',
-        label: 'Focus on top risks first',
-        action: 'Focus on top risk signals while keeping the current layout.',
-      },
-      {
-        id: 'clarify-balance',
-        label: 'Balance risks and growth',
-        action: 'Balance risk and growth signals in the current layout.',
-      },
-      {
-        id: 'clarify-visual',
-        label: 'Prefer minimal visual changes',
-        action: 'Keep layout changes minimal and explain what changed.',
-      },
-    ]
-    setSuggestions(fallbackSuggestions)
-  }, [messages, setSuggestions, status, suggestions.length])
+    setSuggestions(getRoleAwareFallbackSuggestions(agentRole))
+  }, [agentRole, messages, setSuggestions, status, suggestions.length])
 
   return (
     <div className="min-h-0 w-full">

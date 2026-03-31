@@ -146,7 +146,7 @@ export default function DashboardShell({
           <div
             className={`min-h-0 ${
               isCopilotOpen
-                ? 'pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
+                ? 'lg:pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
                 : ''
             }`}
           >

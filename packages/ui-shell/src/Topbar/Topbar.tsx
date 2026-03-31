@@ -24,16 +24,16 @@ export default function Topbar({
         variant="subtle"
         className="flex h-14 items-center justify-between !rounded-none !border-x-0 !border-t-0 px-4 shadow-[var(--ns-shadow-topbar)]"
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {breadcrumbs && breadcrumbs.length > 0 ? (
             <BreadcrumbBar items={breadcrumbs} />
           ) : (
-            <div className="text-sm font-medium text-[color:var(--ns-color-text)]">
+            <div className="truncate text-sm font-medium text-[color:var(--ns-color-text)]">
               {title}
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">{rightSlot}</div>
+        <div className="flex flex-shrink-0 items-center gap-2">{rightSlot}</div>
       </GlassPanel>
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from 'react'
 import { Bot, Send, Square, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { AdapterType, AgentStatus, SuggestionChip } from '@novasphere/agent-core'
 import { GlassPanel } from '@novasphere/ui-glass'
 import { AdapterStatusBadge } from '../AdapterStatusBadge/AdapterStatusBadge'
@@ -149,6 +150,7 @@ export function CopilotPanel({
 }: CopilotPanelProps): React.JSX.Element {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: 'smooth' })
@@ -178,7 +180,7 @@ export function CopilotPanel({
 
   if (!isOpen && onOpenChange) {
     return (
-      <button
+      <motion.button
         type="button"
         onClick={() => onOpenChange(true)}
         className={cn(
@@ -194,12 +196,26 @@ export function CopilotPanel({
           className,
         )}
         aria-label="Open copilot"
+        {...(reduceMotion
+          ? {}
+          : {
+              initial: { y: 0, scale: 1 },
+              animate: {
+                y: [0, -2, 0],
+                scale: [1, 1.02, 1],
+              },
+              transition: {
+                duration: 3.6,
+                ease: 'easeInOut' as const,
+                repeat: Number.POSITIVE_INFINITY,
+              },
+            })}
       >
         <div className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(70%_70%_at_50%_0%,rgba(255,255,255,0.12),transparent_60%)]" />
         </div>
         <Bot className="relative h-5 w-5 text-[var(--ns-color-text)]" />
-      </button>
+      </motion.button>
     )
   }
 

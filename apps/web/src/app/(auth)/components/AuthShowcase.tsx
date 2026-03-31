@@ -69,7 +69,7 @@ export default function AuthShowcase(): React.JSX.Element {
       }
 
   return (
-    <div className="relative flex h-full w-full items-center overflow-hidden border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-medium)] p-8 shadow-2xl backdrop-blur-xl">
+    <div className="relative flex h-full w-full items-center overflow-hidden border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-medium)] p-6 shadow-2xl backdrop-blur-xl sm:p-8">
       <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_18%_20%,rgba(56,189,248,0.25),transparent_45%),radial-gradient(circle_at_82%_18%,rgba(34,197,94,0.18),transparent_46%),radial-gradient(circle_at_54%_84%,rgba(167,139,250,0.2),transparent_52%)]"
@@ -78,7 +78,7 @@ export default function AuthShowcase(): React.JSX.Element {
 
       <div className="pointer-events-none absolute inset-0 opacity-45 [background:linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.06)_32%,transparent_55%,rgba(255,255,255,0.04)_100%)]" />
 
-      <div className="relative z-10 grid w-full gap-7">
+      <div className="relative z-10 grid w-full gap-6 sm:gap-7">
         <div>
           <div className="inline-flex items-center gap-3 rounded-full border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] px-3 py-1.5">
             <Image
@@ -99,7 +99,7 @@ export default function AuthShowcase(): React.JSX.Element {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: 'easeOut' as const }}
-          className="relative h-[320px] rounded-2xl border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] p-5 [perspective:1300px]"
+          className="relative h-[clamp(220px,36vh,320px)] rounded-2xl border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] p-4 [perspective:1300px] sm:p-5"
         >
           <motion.div
             aria-hidden
@@ -198,11 +198,11 @@ export default function AuthShowcase(): React.JSX.Element {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-3 gap-2 text-xs text-[color:var(--ns-color-muted)]">
+        <div className="flex flex-wrap gap-2 text-xs text-[color:var(--ns-color-muted)]">
           {novaConfig.product.criticalSignals.slice(0, 3).map((signal) => (
             <span
               key={signal}
-              className="rounded-full border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] px-3 py-1.5 text-center tracking-[0.12em] uppercase"
+              className="rounded-full border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] px-3 py-1.5 tracking-[0.12em] uppercase"
             >
               {signal.replace('_', ' ')}
             </span>

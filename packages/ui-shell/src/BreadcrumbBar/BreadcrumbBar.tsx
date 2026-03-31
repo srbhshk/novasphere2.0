@@ -14,17 +14,19 @@ export default function BreadcrumbBar({ items }: BreadcrumbBarProps): React.JSX.
 
   return (
     <nav aria-label="Breadcrumb">
-      <ol className="flex items-center gap-2 text-sm">
+      <ol className="flex min-w-0 items-center gap-2 text-sm">
         {items.map((item, index) => {
           const isLast = index === items.length - 1
 
           return (
-            <li key={`${item.href}-${item.label}`} className="flex items-center">
+            <li key={`${item.href}-${item.label}`} className="flex min-w-0 items-center">
               {isLast ? (
-                <span className="text-[color:var(--ns-color-text)]">{item.label}</span>
+                <span className="truncate text-[color:var(--ns-color-text)]">
+                  {item.label}
+                </span>
               ) : (
                 <a
-                  className="text-[color:var(--ns-color-muted)] transition-colors hover:text-[color:var(--ns-color-text)]"
+                  className="max-w-[40vw] truncate text-[color:var(--ns-color-muted)] transition-colors hover:text-[color:var(--ns-color-text)] sm:max-w-none"
                   href={item.href}
                 >
                   {item.label}

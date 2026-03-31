@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import type { MotionStyle } from 'framer-motion'
 import { Reorder, motion } from 'framer-motion'
 import type {
@@ -25,6 +25,18 @@ export const BentoGrid = memo(function BentoGrid({
   onReorder,
   className,
 }: BentoGridProps) {
+  const [isCompact, setIsCompact] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)')
+    const update = (): void => setIsCompact(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => {
+      mql.removeEventListener('change', update)
+    }
+  }, [])
+
   const visibleCards = useMemo(
     () => layout.filter((card) => card.visible).sort((a, b) => a.order - b.order),
     [layout],
@@ -32,7 +44,9 @@ export const BentoGrid = memo(function BentoGrid({
 
   const gridStyle: MotionStyle = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+    gridTemplateColumns: isCompact
+      ? 'repeat(1, minmax(0, 1fr))'
+      : 'repeat(12, minmax(0, 1fr))',
     gridAutoFlow: 'row dense',
     gridAutoRows: 'minmax(160px, auto)',
     gap: '16px',
@@ -63,6 +77,7 @@ export const BentoGrid = memo(function BentoGrid({
               <BentoPlaceholder moduleId={card.moduleId} />
             )
 
+            const colSpan = isCompact ? 12 : card.colSpan
             return (
               <Reorder.Item
                 key={card.id}
@@ -72,7 +87,7 @@ export const BentoGrid = memo(function BentoGrid({
                 whileDrag="dragging"
                 layout
                 style={{
-                  gridColumn: `span ${card.colSpan} / span ${card.colSpan}`,
+                  gridColumn: `span ${colSpan} / span ${colSpan}`,
                   gridRow: `span ${card.rowSpan} / span ${card.rowSpan}`,
                 }}
               >
@@ -99,6 +114,7 @@ export const BentoGrid = memo(function BentoGrid({
               <BentoPlaceholder moduleId={card.moduleId} />
             )
 
+            const colSpan = isCompact ? 12 : card.colSpan
             return (
               <motion.div
                 key={card.id}
@@ -106,7 +122,7 @@ export const BentoGrid = memo(function BentoGrid({
                 whileDrag="dragging"
                 layout
                 style={{
-                  gridColumn: `span ${card.colSpan} / span ${card.colSpan}`,
+                  gridColumn: `span ${colSpan} / span ${colSpan}`,
                   gridRow: `span ${card.rowSpan} / span ${card.rowSpan}`,
                 }}
               >

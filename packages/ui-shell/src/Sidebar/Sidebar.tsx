@@ -22,7 +22,7 @@ export default function Sidebar({
   const isCollapsed = true
 
   return (
-    <div className="relative z-30 h-full flex-shrink-0">
+    <div className="relative z-30 hidden h-full flex-shrink-0 sm:block">
       <GlassPanel
         variant="strong"
         className="flex h-full w-[72px] flex-col !rounded-none !border-y-0 !border-l-0 p-2 shadow-[var(--ns-shadow-sidebar)]"

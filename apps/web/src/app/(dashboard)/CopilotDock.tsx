@@ -159,12 +159,19 @@ export default function CopilotDock(): React.JSX.Element {
       className={`pointer-events-none fixed z-40 ${
         // Keep the dock pinned to the dashboard main area (below Topbar),
         // so the page scrollbar remains on the dashboard content, not on the dock.
-        isOpen ? 'top-[calc(56px+1.5rem)] right-6 bottom-6' : 'right-6 bottom-6'
+        //
+        // Mobile: lift above bottom nav; center open panel.
+        // Desktop: keep right-anchored dock + panel.
+        isOpen
+          ? 'top-[calc(56px+1rem)] bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 sm:top-[calc(56px+1.5rem)] sm:right-6 sm:bottom-6 sm:left-auto sm:translate-x-0'
+          : 'right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] sm:right-6 sm:bottom-6'
       }`}
     >
       <div
         className={`pointer-events-auto ${
-          isOpen ? 'h-full w-[var(--ns-copilot-width)]' : ''
+          isOpen
+            ? 'h-full w-[min(var(--ns-copilot-width),calc(100vw-2rem))] sm:w-[var(--ns-copilot-width)]'
+            : ''
         }`}
       >
         <CopilotPanelNoSsr

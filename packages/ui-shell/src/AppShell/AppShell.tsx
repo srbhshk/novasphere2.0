@@ -5,6 +5,7 @@ import { AmbientBackground, GrainOverlay } from '@novasphere/ui-glass'
 
 import Sidebar from '../Sidebar/Sidebar'
 import Topbar from '../Topbar/Topbar'
+import MobileBottomNav from '../MobileBottomNav/MobileBottomNav'
 
 export type AppShellProps = {
   tenant: TenantConfig
@@ -36,7 +37,7 @@ export default function AppShell({
       : null
 
   return (
-    <div className="relative flex h-[100dvh] w-screen overflow-hidden bg-[color:var(--ns-color-bg)]">
+    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[color:var(--ns-color-bg)]">
       <AmbientBackground />
       <GrainOverlay />
       {accentOverrideCss ? <style>{accentOverrideCss}</style> : null}
@@ -54,9 +55,13 @@ export default function AppShell({
             {...(breadcrumbs ? { breadcrumbs } : {})}
             {...(topbarRightSlot ? { rightSlot: topbarRightSlot } : {})}
           />
-          <main className="relative min-h-0 flex-1 overflow-y-auto p-6">{children}</main>
+          <main className="relative min-h-0 flex-1 overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-6">
+            {children}
+          </main>
         </div>
       </div>
+
+      <MobileBottomNav tenant={tenant} currentPath={currentPath} />
     </div>
   )
 }

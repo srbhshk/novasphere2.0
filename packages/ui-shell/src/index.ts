@@ -10,6 +10,9 @@ export type { TopbarProps } from './Topbar/Topbar'
 export { default as NavItem } from './NavItem/NavItem'
 export type { NavItemProps } from './NavItem/NavItem'
 
+export { default as MobileBottomNav } from './MobileBottomNav/MobileBottomNav'
+export type { MobileBottomNavProps } from './MobileBottomNav/MobileBottomNav'
+
 export { default as BreadcrumbBar } from './BreadcrumbBar/BreadcrumbBar'
 export type { BreadcrumbBarProps } from './BreadcrumbBar/BreadcrumbBar'
 

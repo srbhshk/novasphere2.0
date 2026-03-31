@@ -7,8 +7,8 @@ import type { FeatureFlags, TenantConfig, TenantNavItem } from './tenant.types'
 export class TenantNotFoundError extends Error {
   constructor(message: string) {
     super(message)
-    Object.setPrototypeOf(this, new.target.prototype)
     this.name = 'TenantNotFoundError'
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
 
@@ -43,58 +43,59 @@ function fromDb(org: Organization, cfg: DbTenantConfig | undefined): TenantConfi
   }
 }
 
+/**
+ * Resolve tenant by organization id.
+ * When `DATABASE_URL` is set, the DB is queried first so `organization.name` is used
+ * even if `NEXT_PUBLIC_DATA_SOURCE` is still `mock` (common in local dev).
+ */
 export async function resolveTenant(organizationId: string): Promise<TenantConfig> {
+  if (process.env['DATABASE_URL']) {
+    const org = await db.query.organizations.findFirst({
+      where: (t, { eq }) => eq(t.id, organizationId),
+    })
+    if (org) {
+      const cfg = await db.query.tenantConfigs.findFirst({
+        where: (t, { eq }) => eq(t.organizationId, org.id),
+      })
+      return fromDb(org, cfg)
+    }
+  }
+
   const dataSource =
     process.env['DATA_SOURCE'] ?? process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
-  if (dataSource === 'mock') {
+  if (dataSource === 'mock' || !process.env['DATABASE_URL']) {
     return { ...FALLBACK_TENANT, id: organizationId }
   }
 
-  if (!process.env['DATABASE_URL']) {
-    return { ...FALLBACK_TENANT, id: organizationId }
-  }
-
-  const org = await db.query.organizations.findFirst({
-    where: (t, { eq }) => eq(t.id, organizationId),
-  })
-
-  if (!org) {
-    throw new TenantNotFoundError(
-      `[novasphere/tenant-core] Tenant not found: ${organizationId}`,
-    )
-  }
-
-  const cfg = await db.query.tenantConfigs.findFirst({
-    where: (t, { eq }) => eq(t.organizationId, org.id),
-  })
-
-  return fromDb(org, cfg)
+  throw new TenantNotFoundError(
+    `[novasphere/tenant-core] Tenant not found: ${organizationId}`,
+  )
 }
 
+/**
+ * Resolve tenant by URL slug (e.g. `/demo/dashboard` → slug `demo`).
+ * Prefer this for shell UI so the id matches seeded rows (`org_demo`) while routes use `demo`.
+ */
 export async function resolveTenantBySlug(slug: string): Promise<TenantConfig> {
+  if (process.env['DATABASE_URL']) {
+    const org = await db.query.organizations.findFirst({
+      where: (t, { eq }) => eq(t.slug, slug),
+    })
+    if (org) {
+      const cfg = await db.query.tenantConfigs.findFirst({
+        where: (t, { eq }) => eq(t.organizationId, org.id),
+      })
+      return fromDb(org, cfg)
+    }
+  }
+
   const dataSource =
     process.env['DATA_SOURCE'] ?? process.env['NEXT_PUBLIC_DATA_SOURCE'] ?? 'mock'
-  if (dataSource === 'mock') {
+  if (dataSource === 'mock' || !process.env['DATABASE_URL']) {
     return { ...FALLBACK_TENANT, slug }
   }
 
-  if (!process.env['DATABASE_URL']) {
-    return { ...FALLBACK_TENANT, slug }
-  }
-
-  const org = await db.query.organizations.findFirst({
-    where: (t, { eq }) => eq(t.slug, slug),
-  })
-
-  if (!org) {
-    throw new TenantNotFoundError(
-      `[novasphere/tenant-core] Tenant not found for slug: ${slug}`,
-    )
-  }
-
-  const cfg = await db.query.tenantConfigs.findFirst({
-    where: (t, { eq }) => eq(t.organizationId, org.id),
-  })
-
-  return fromDb(org, cfg)
+  throw new TenantNotFoundError(
+    `[novasphere/tenant-core] Tenant not found for slug: ${slug}`,
+  )
 }

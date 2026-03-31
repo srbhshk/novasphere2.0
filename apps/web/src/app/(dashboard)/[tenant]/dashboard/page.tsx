@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
-import { GlassCard, Skeleton } from '@novasphere/ui-glass'
+import { GlassCard, Skeleton, Button, Badge } from '@novasphere/ui-glass'
 import { useMetricsList } from '@/hooks/useMetricsList'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
@@ -14,7 +15,11 @@ import { MODULE_REGISTRY } from './modules/registry'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
-import { classifyUiIntent, requiresToolForIntent } from '@novasphere/agent-core'
+import {
+  buildSignalExplainAndRefinePrompt,
+  classifyUiIntent,
+  requiresToolForIntent,
+} from '@novasphere/agent-core'
 import type { AdapterType } from '@novasphere/agent-core'
 import type { MetricsListResult } from '@/hooks/useMetricsList'
 import { useCopilotChat } from '../../CopilotContext'
@@ -381,7 +386,7 @@ export default function DashboardPage(): React.JSX.Element {
   const { data: sessionData, isPending } = useSession()
   const authSession = useMemo(() => toAuthSession(sessionData ?? null), [sessionData])
   const agentRole = normalizeAgentRole(authSession?.role)
-  const hasResolvedSession = !isPending && authSession != null
+  const [signalToastDismissed, setSignalToastDismissed] = useState(false)
 
   const layout = useLayoutStore((s) => s.layout)
   const setLayout = useLayoutStore((s) => s.setLayout)
@@ -394,10 +399,10 @@ export default function DashboardPage(): React.JSX.Element {
   const setAdapterStatus = useAgentPanelStore((s) => s.setAdapterStatus)
   const suggestions = useAgentPanelStore((s) => s.suggestions)
   const processedToolRef = useRef<Set<string>>(new Set())
-  const initialBootstrapSentRef = useRef<boolean>(false)
   const toolRetryCountRef = useRef<number>(0)
 
   const { messages, sendMessage, status } = useCopilotChat()
+  const chatBusy = status === 'streaming' || status === 'submitted'
 
   // Use legacy hook for anomaly detection only (role-scoped data via useDashboardMetrics in modules)
   const { data: metricsData, isPending: metricsPending } = useMetricsList(agentRole)
@@ -405,6 +410,14 @@ export default function DashboardPage(): React.JSX.Element {
     () => (metricsData != null ? getFirstAnomalousMetric(metricsData) : null),
     [metricsData],
   )
+  const setCopilotOpen = useAgentPanelStore((s) => s.setOpen)
+
+  const shouldShowSignalToast =
+    !signalToastDismissed &&
+    !isPending &&
+    authSession != null &&
+    !metricsPending &&
+    anomalyMetric != null
 
   useEffect(() => {
     let mounted = true
@@ -430,36 +443,6 @@ export default function DashboardPage(): React.JSX.Element {
       mounted = false
     }
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
-
-  // Single bootstrap turn: anomaly + initial layout in one request when data shows an anomaly,
-  // otherwise layout-only. Avoids racing two effects on `messages.length`.
-  useEffect(() => {
-    if (isPending || !hasResolvedSession) return
-    if (metricsPending) return
-    if (status === 'submitted' || status === 'streaming') return
-    if (initialBootstrapSentRef.current) return
-
-    initialBootstrapSentRef.current = true
-    setGenerating(true)
-    if (anomalyMetric != null) {
-      sendMessage({
-        text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}. Then compose the initial dashboard layout for this user (role: ${agentRole}) using the render_layout tool with role-appropriate modules.`,
-      })
-    } else {
-      sendMessage({
-        text: 'Compose the initial dashboard layout for this user.',
-      })
-    }
-  }, [
-    agentRole,
-    anomalyMetric,
-    hasResolvedSession,
-    isPending,
-    metricsPending,
-    sendMessage,
-    setGenerating,
-    status,
-  ])
 
   useEffect(() => {
     if (status === 'ready') {
@@ -514,7 +497,26 @@ export default function DashboardPage(): React.JSX.Element {
         if (result.status === 'validation_failed') {
           if (toolRetryCountRef.current < 1) {
             toolRetryCountRef.current += 1
-            sendMessage({ text: result.feedback })
+            setSuggestions([
+              {
+                id: 'tool-retry-focus',
+                label: 'Try focused refinement',
+                action:
+                  'Refine the current layout with valid module IDs and keep the same overall structure.',
+              },
+              {
+                id: 'tool-retry-balanced',
+                label: 'Rebalance layout',
+                action:
+                  'Rebalance the dashboard layout using valid modules and maintain a clean 12-column composition.',
+              },
+              {
+                id: 'tool-retry-anomaly',
+                label: 'Explain anomaly first',
+                action:
+                  'Explain the top anomaly first, then refine the current layout with valid module IDs.',
+              },
+            ])
             continue
           }
 
@@ -525,7 +527,7 @@ export default function DashboardPage(): React.JSX.Element {
         logToolExecutionFailure(toolName, result)
       }
     }
-  }, [messages, setLayout, getLayout, sendMessage, setSuggestions])
+  }, [messages, setLayout, getLayout, setSuggestions])
 
   useEffect(() => {
     const lastUser = [...messages]
@@ -621,6 +623,52 @@ export default function DashboardPage(): React.JSX.Element {
   return (
     <div className="min-h-0 w-full">
       <DashboardErrorBoundary>
+        {shouldShowSignalToast ? (
+          <GlassCard
+            variant="strong"
+            className="mb-4 flex w-full items-start justify-between gap-3 p-4"
+          >
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2">
+                <Badge variant="outline">Signal detected</Badge>
+                <div className="truncate text-sm font-medium text-[var(--ns-color-text)]">
+                  {anomalyMetric.metricLabel} anomaly
+                </div>
+              </div>
+              <div className="text-sm text-[color:var(--ns-color-muted)]">
+                A data signal looks unusual. Start an investigation to explain it and
+                refine what the dashboard should prioritize next.
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setSignalToastDismissed(true)}
+                aria-label="Dismiss signal banner"
+                className="h-9 w-9 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={chatBusy}
+                onClick={() => {
+                  if (chatBusy) return
+                  setCopilotOpen(true)
+                  sendMessage({
+                    text: buildSignalExplainAndRefinePrompt({
+                      metricLabel: anomalyMetric.metricLabel,
+                      metricValue: anomalyMetric.value,
+                      role: agentRole,
+                    }),
+                  })
+                }}
+              >
+                Investigate
+              </Button>
+            </div>
+          </GlassCard>
+        ) : null}
         {layout == null && isGenerating ? (
           // Skeleton state: LLM is composing the initial layout
           <div className="grid w-full auto-rows-[minmax(120px,auto)] grid-cols-12 gap-4">

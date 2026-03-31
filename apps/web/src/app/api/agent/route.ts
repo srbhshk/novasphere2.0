@@ -378,17 +378,24 @@ export async function POST(request: Request): Promise<Response> {
   )
   // Safety: headers return string|null and the null case is handled by fallback.
   currentRoute = (request.headers.get('x-current-route') as string) ?? '/'
-  try {
-    modelMessages = await convertToModelMessages(
-      // Safety: validated useChat payload matches AI SDK model message conversion input.
-      useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
-      {
-        tools: genUiTools,
-        ignoreIncompleteToolCalls: true,
-      },
-    )
-  } catch {
-    // Fallback for providers that reject some message-part shapes (e.g. item_reference).
+  const canUseConvertedHistory = env.AI_PROVIDER !== 'openai'
+  if (canUseConvertedHistory) {
+    try {
+      modelMessages = await convertToModelMessages(
+        // Safety: validated useChat payload matches AI SDK model message conversion input.
+        useChatParsed.data.messages as Parameters<typeof convertToModelMessages>[0],
+        {
+          tools: genUiTools,
+          ignoreIncompleteToolCalls: true,
+        },
+      )
+    } catch {
+      // Fallback for providers that reject some message-part shapes (e.g. item_reference).
+      modelMessages = undefined
+    }
+  } else {
+    // OpenAI Responses can reject historical item references from client-side UI messages.
+    // For stability we run turns prompt-first and use summarized conversation in context.
     modelMessages = undefined
   }
 

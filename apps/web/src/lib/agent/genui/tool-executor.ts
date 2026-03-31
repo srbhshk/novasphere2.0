@@ -222,6 +222,57 @@ function normalizeLayoutOrder(layout: BentoCardConfig[]): BentoCardConfig[] {
   }))
 }
 
+function dedupeByModuleId(layout: BentoCardConfig[]): BentoCardConfig[] {
+  const seen = new Set<string>()
+  const dedupedReversed: BentoCardConfig[] = []
+  for (let i = layout.length - 1; i >= 0; i -= 1) {
+    const card = layout[i]
+    if (!card) continue
+    if (seen.has(card.moduleId)) continue
+    seen.add(card.moduleId)
+    dedupedReversed.push(card)
+  }
+  return dedupedReversed.reverse()
+}
+
+function packVisibleCards(layout: BentoCardConfig[]): BentoCardConfig[] {
+  const orderedVisible = [...layout]
+    .filter((card) => card.visible)
+    .sort((a, b) => a.order - b.order)
+  const hidden = [...layout]
+    .filter((card) => !card.visible)
+    .sort((a, b) => a.order - b.order)
+
+  const pending = [...orderedVisible]
+  const packed: BentoCardConfig[] = []
+  let remainingInRow = 12
+
+  while (pending.length > 0) {
+    let selectedIndex = pending.findIndex((card) => card.colSpan <= remainingInRow)
+    if (selectedIndex === -1) {
+      remainingInRow = 12
+      selectedIndex = pending.findIndex((card) => card.colSpan <= remainingInRow)
+      if (selectedIndex === -1) {
+        selectedIndex = 0
+      }
+    }
+
+    const selected = pending.splice(selectedIndex, 1)[0]
+    if (!selected) continue
+    packed.push(selected)
+    remainingInRow -= selected.colSpan
+    if (remainingInRow <= 0) {
+      remainingInRow = 12
+    }
+  }
+
+  return normalizeLayoutOrder([...packed, ...hidden])
+}
+
+function sanitizeLayout(layout: BentoCardConfig[]): BentoCardConfig[] {
+  return packVisibleCards(dedupeByModuleId(layout))
+}
+
 function toLayoutMode(args: Record<string, unknown>): LayoutMode {
   const rawMode = args['layoutMode']
   if (rawMode === 'replace' || rawMode === 'refine') {
@@ -348,15 +399,15 @@ export function executeToolCall(
       const current = stores.layoutStore.getLayout() ?? []
       const nextLayout =
         mode === 'replace' || current.length === 0
-          ? normalizeLayoutOrder(parsed)
+          ? parsed
           : mergeLayoutRefine(current, parsed)
-      stores.layoutStore.setLayout(nextLayout)
+      stores.layoutStore.setLayout(sanitizeLayout(nextLayout))
       return { status: 'applied' }
     }
 
     if (toolName === 'render_component') {
       const current = stores.layoutStore.getLayout() ?? []
-      stores.layoutStore.setLayout(patchCard(current, safeArgs))
+      stores.layoutStore.setLayout(sanitizeLayout(patchCard(current, safeArgs)))
       return { status: 'applied' }
     }
 
@@ -414,7 +465,7 @@ export function executeToolCall(
           order: maxOrder + 1,
           config: anomalyConfig,
         })
-        stores.layoutStore.setLayout(next)
+        stores.layoutStore.setLayout(sanitizeLayout(next))
         return { status: 'applied' }
       }
 
@@ -431,7 +482,7 @@ export function executeToolCall(
         },
         title: existing.title ?? 'Anomaly Explanation',
       }
-      stores.layoutStore.setLayout(next)
+      stores.layoutStore.setLayout(sanitizeLayout(next))
       return { status: 'applied' }
     }
 
@@ -460,7 +511,7 @@ export function executeToolCall(
             ? true
             : card.visible,
       }))
-      stores.layoutStore.setLayout(next)
+      stores.layoutStore.setLayout(sanitizeLayout(next))
       return { status: 'applied' }
     }
 

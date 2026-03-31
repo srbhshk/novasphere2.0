@@ -35,7 +35,7 @@ async function seed(): Promise<void> {
     .insert(organizations)
     .values({
       id: 'org_demo',
-      name: 'novasphere Demo',
+      name: 'Novasphere Demo',
       slug: 'demo',
       plan: 'pro',
       accentColor: '#4f8ef7',
@@ -198,7 +198,6 @@ async function seed(): Promise<void> {
     ])
     .onConflictDoNothing()
 
-  // eslint-disable-next-line no-console
   console.log('✓ Seeded: 1 org · 3 users · 3 members · 1 tenant config · 2 preferences')
 }
 

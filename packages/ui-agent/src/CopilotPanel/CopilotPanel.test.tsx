@@ -15,14 +15,20 @@ const defaultProps = {
 describe('CopilotPanel', () => {
   it('renders with empty messages', () => {
     render(<CopilotPanel {...defaultProps} />)
-    expect(screen.getByPlaceholderText(/Ask anything/)).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText(
+        /Ask about signals, risks, or how to optimize the dashboard/i,
+      ),
+    ).toBeInTheDocument()
   })
 
   it('calls onSend when send button is clicked', async () => {
     const onSend = vi.fn()
     const user = userEvent.setup()
     render(<CopilotPanel {...defaultProps} onSend={onSend} />)
-    const input = screen.getByPlaceholderText(/Ask anything/)
+    const input = screen.getByPlaceholderText(
+      /Ask about signals, risks, or how to optimize the dashboard/i,
+    )
     await user.type(input, 'Hello')
     const sendButton = screen.getByRole('button', { name: /send/i })
     fireEvent.click(sendButton)
@@ -32,7 +38,9 @@ describe('CopilotPanel', () => {
   it('calls onSend when Enter is pressed in textarea', async () => {
     const onSend = vi.fn()
     render(<CopilotPanel {...defaultProps} onSend={onSend} />)
-    const input = screen.getByPlaceholderText(/Ask anything/)
+    const input = screen.getByPlaceholderText(
+      /Ask about signals, risks, or how to optimize the dashboard/i,
+    )
     fireEvent.change(input, { target: { value: 'Test message' } })
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: false })
     expect(onSend).toHaveBeenCalledWith('Test message')
@@ -40,7 +48,11 @@ describe('CopilotPanel', () => {
 
   it('disables input when isLoading is true', () => {
     render(<CopilotPanel {...defaultProps} isLoading />)
-    expect(screen.getByPlaceholderText(/Ask anything/)).toBeDisabled()
+    expect(
+      screen.getByPlaceholderText(
+        /Ask about signals, risks, or how to optimize the dashboard/i,
+      ),
+    ).toBeDisabled()
     expect(screen.getByRole('button', { name: /send/i })).toBeDisabled()
   })
 

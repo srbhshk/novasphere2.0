@@ -7,12 +7,14 @@ import { suggestionVariants } from '../variants'
 export type SuggestionChipsProps = {
   chips: SuggestionChip[]
   onSelect: (chip: SuggestionChip) => void
+  disabled?: boolean
   className?: string
 }
 
 export function SuggestionChips({
   chips,
   onSelect,
+  disabled = false,
   className,
 }: SuggestionChipsProps): React.JSX.Element | null {
   if (chips.length === 0) return null
@@ -30,8 +32,12 @@ export function SuggestionChips({
               initial="initial"
               animate="animate"
               exit="exit"
-              onClick={() => onSelect(chip)}
-              className="rounded-full border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] px-3 py-1.5 text-sm text-[var(--ns-color-text)] hover:bg-[var(--ns-glass-bg-medium)] focus:ring-2 focus:ring-[var(--ns-color-accent)]/50 focus:outline-none"
+              onClick={() => {
+                if (disabled) return
+                onSelect(chip)
+              }}
+              disabled={disabled}
+              className="rounded-full border border-[var(--ns-color-border)] bg-[var(--ns-glass-bg-subtle)] px-3 py-1.5 text-sm text-[var(--ns-color-text)] hover:bg-[var(--ns-glass-bg-medium)] focus:ring-2 focus:ring-[var(--ns-color-accent)]/50 focus:outline-none disabled:pointer-events-none disabled:opacity-50"
             >
               {chip.label}
             </motion.button>

@@ -20,7 +20,7 @@ import * as React from 'react'
 import type { TenantNavItem } from '@novasphere/tenant-core'
 
 import { cn } from '../lib/utils'
-import styles from './NavItem.module.css'
+import './NavItem.module.css'
 
 type IconComponentType = React.ComponentType<{
   className?: string
@@ -71,10 +71,11 @@ export default function NavItem({
 }: NavItemProps): React.JSX.Element {
   const IconComponent = getIconByName(item.icon)
 
-  const anchor = (
+  const link = (
     <a
-      className={cn(styles.item, isActive ? styles.active : null)}
+      className={cn('ns-nav-item', isActive ? 'ns-nav-item--active' : undefined)}
       href={item.href}
+      aria-current={isActive ? 'page' : undefined}
       onClick={(event) => {
         if (!onClick) {
           return
@@ -85,9 +86,9 @@ export default function NavItem({
       }}
     >
       <IconComponent aria-hidden="true" size={18} />
-      {!isCollapsed ? <span className={styles.label}>{item.label}</span> : null}
+      {!isCollapsed ? <span className="ns-nav-label">{item.label}</span> : null}
       {item.badge ? (
-        <span className={styles.badge}>
+        <span className="ns-nav-badge">
           <Badge variant="secondary">{item.badge}</Badge>
         </span>
       ) : null}
@@ -95,15 +96,17 @@ export default function NavItem({
   )
 
   if (!isCollapsed) {
-    return anchor
+    return <div className="ns-nav-perspective">{link}</div>
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>{anchor}</TooltipTrigger>
-        <TooltipContent side="right">{item.label}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="ns-nav-perspective">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{link}</TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
   )
 }

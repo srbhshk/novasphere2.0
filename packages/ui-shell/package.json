@@ -39,6 +39,7 @@
     "@novasphere/ui-auth": "workspace:*"
   },
   "devDependencies": {
+    "framer-motion": "^12",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",

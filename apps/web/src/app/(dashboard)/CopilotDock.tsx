@@ -47,30 +47,10 @@ export default function CopilotDock(): React.JSX.Element {
   const downloadProgress = useAgentPanelStore((s) => s.downloadProgress)
   const setOpen = useAgentPanelStore((s) => s.setOpen)
 
-  const { messages, sendMessage, status, stop } = useCopilotChat()
+  const { messages, sendMessage, status, stop, userName } = useCopilotChat()
 
   const chatBusy = status === 'streaming' || status === 'submitted'
   const isLoading = chatBusy
-
-  const pendingSendRef = React.useRef<string | null>(null)
-
-  React.useEffect(() => {
-    if (status !== 'ready' || pendingSendRef.current == null) return
-    const text = pendingSendRef.current
-    pendingSendRef.current = null
-    sendMessage({ text })
-  }, [sendMessage, status])
-
-  const queueOrSend = React.useCallback(
-    (text: string) => {
-      if (status === 'ready') {
-        sendMessage({ text })
-        return
-      }
-      pendingSendRef.current = text
-    },
-    [sendMessage, status],
-  )
 
   const normalizedMessages = React.useMemo(() => {
     return messages.map((m) => {
@@ -123,7 +103,32 @@ export default function CopilotDock(): React.JSX.Element {
     })
   }, [messages])
 
+  const seededMessages = React.useMemo(() => {
+    if (normalizedMessages.length > 0) {
+      return normalizedMessages
+    }
+
+    return [
+      {
+        id: 'seed-welcome',
+        role: 'assistant' as const,
+        content: `Welcome ${userName}, how may I help you today?`,
+        timestamp: 0,
+      },
+      {
+        id: 'seed-hints',
+        role: 'assistant' as const,
+        content:
+          'You can ask me to explain a signal, summarize risks, or optimize what your dashboard should prioritize next.',
+        timestamp: 1,
+      },
+    ]
+  }, [normalizedMessages, userName])
+
   const streamingContent = React.useMemo(() => {
+    if (status !== 'streaming' && status !== 'submitted') {
+      return undefined
+    }
     const last = messages[messages.length - 1]
     if (!last || typeof last !== 'object') return undefined
     // Safety: last message is object-like in AI SDK payloads.
@@ -139,20 +144,34 @@ export default function CopilotDock(): React.JSX.Element {
     const raw = (textPart as Record<string, unknown>)['text']
     if (typeof raw !== 'string') return undefined
     return sanitizeStreamingText(raw)
-  }, [messages])
+  }, [messages, status])
+
+  const handleSend = React.useCallback(
+    (text: string) => {
+      if (status === 'submitted' || status === 'streaming') return
+      sendMessage({ text })
+    },
+    [sendMessage, status],
+  )
 
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-40">
+    <div
+      className={`pointer-events-none fixed z-40 ${
+        // Keep the dock pinned to the dashboard main area (below Topbar),
+        // so the page scrollbar remains on the dashboard content, not on the dock.
+        isOpen ? 'top-[calc(56px+1.5rem)] right-6 bottom-6' : 'right-6 bottom-6'
+      }`}
+    >
       <div
         className={`pointer-events-auto ${
-          isOpen ? 'h-[70dvh] max-h-[560px] w-[var(--ns-copilot-width)]' : ''
+          isOpen ? 'h-full w-[var(--ns-copilot-width)]' : ''
         }`}
       >
         <CopilotPanelNoSsr
-          messages={normalizedMessages}
+          messages={seededMessages}
           isLoading={isLoading}
-          lockInputWhileBusy={false}
-          allowSendWhileBusy
+          lockInputWhileBusy
+          allowSendWhileBusy={false}
           onStop={stop}
           {...(streamingContent != null ? { streamingContent } : {})}
           suggestions={suggestions}
@@ -166,9 +185,9 @@ export default function CopilotDock(): React.JSX.Element {
                 : adapterStatus
           }
           downloadProgress={downloadProgress}
-          onSend={queueOrSend}
+          onSend={handleSend}
           onSuggestionSelect={(chip: SuggestionChip) => {
-            queueOrSend(chip.action)
+            handleSend(chip.action)
             setSuggestions([])
           }}
           isOpen={isOpen}

@@ -15,6 +15,7 @@ type CopilotChatContextValue = {
   sendMessage: (opts: { text: string }) => void
   status: 'ready' | 'submitted' | 'streaming' | 'error'
   stop: () => void
+  userName: string
 }
 
 const CopilotChatContext = React.createContext<CopilotChatContextValue | null>(null)
@@ -43,6 +44,7 @@ export function CopilotChatProvider({
   const userId = authSession?.userId ?? 'anonymous'
   const tenantId = authSession?.tenantId ?? 'demo'
   const agentRole = normalizeAgentRole(authSession?.role)
+  const userName = authSession?.name ?? 'User'
   const pathname = usePathname()
 
   // Keep transport stable across route changes so chat state persists across pages.
@@ -63,8 +65,8 @@ export function CopilotChatProvider({
   const { messages, sendMessage, status, stop } = useChat({ transport })
 
   const value = React.useMemo<CopilotChatContextValue>(
-    () => ({ messages, sendMessage, status, stop }),
-    [messages, sendMessage, status, stop],
+    () => ({ messages, sendMessage, status, stop, userName }),
+    [messages, sendMessage, status, stop, userName],
   )
 
   return (

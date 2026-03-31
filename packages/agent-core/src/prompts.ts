@@ -460,6 +460,25 @@ export function allowedFallbackForIntent(
   return UI_CONTRACT_FALLBACK.none
 }
 
+export function buildSignalExplainAndRefinePrompt(args: {
+  metricLabel: string
+  metricValue: number
+  role: UserRole
+}): string {
+  const metricLabel = args.metricLabel.trim()
+  const value = Number.isFinite(args.metricValue) ? args.metricValue : 0
+  const role = args.role
+
+  return [
+    `Explain this anomaly: ${metricLabel} is ${value}.`,
+    '',
+    // Include known layout-intent phrases so apps/web can rely on `detectLayoutIntent()`.
+    // (Server may additionally enforce tools via uiContract.requiresTool depending on intent.)
+    `Then optimize and improve the dashboard: show me the most important modules for a ${role} and prioritize what matters next.`,
+    'Use explain_anomaly and render_layout as needed.',
+  ].join('\n')
+}
+
 type PromptBuilders = {
   system: (args: { role: UserRole; product: ProductConfig }) => string
   layout: (args: { context: AgentContext }) => string

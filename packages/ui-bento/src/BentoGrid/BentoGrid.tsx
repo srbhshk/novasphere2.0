@@ -33,6 +33,7 @@ export const BentoGrid = memo(function BentoGrid({
   const gridStyle: MotionStyle = {
     display: 'grid',
     gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+    gridAutoFlow: 'row dense',
     gridAutoRows: 'minmax(160px, auto)',
     gap: '16px',
     width: '100%',

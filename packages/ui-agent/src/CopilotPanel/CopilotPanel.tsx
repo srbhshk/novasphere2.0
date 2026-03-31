@@ -87,6 +87,42 @@ function toAgentMessage(
   return mapped && mapped.length > 0 ? { ...base, toolCalls: mapped } : base
 }
 
+function collapseAssistantMessages(
+  messages: Array<ReturnType<typeof toAgentMessage>>,
+): Array<ReturnType<typeof toAgentMessage>> {
+  const collapsed: Array<ReturnType<typeof toAgentMessage>> = []
+  for (const message of messages) {
+    const prev = collapsed[collapsed.length - 1]
+    if (!prev) {
+      collapsed.push(message)
+      continue
+    }
+
+    if (prev.role === 'assistant' && message.role === 'assistant') {
+      const prevContent = prev.content.trim()
+      const nextContent = message.content.trim()
+      const mergedContent =
+        prevContent.length > 0 && nextContent.length > 0
+          ? `${prevContent}\n\n${nextContent}`
+          : prevContent.length > 0
+            ? prevContent
+            : nextContent
+      const mergedToolCalls = [...(prev.toolCalls ?? []), ...(message.toolCalls ?? [])]
+
+      collapsed[collapsed.length - 1] = {
+        ...prev,
+        content: mergedContent,
+        timestamp: Math.max(prev.timestamp, message.timestamp),
+        ...(mergedToolCalls.length > 0 ? { toolCalls: mergedToolCalls } : {}),
+      }
+      continue
+    }
+
+    collapsed.push(message)
+  }
+  return collapsed
+}
+
 /**
  * Copilot panel. Intentionally stateless on AI. All AI calls are made in apps/web
  * via AI SDK 6 useChat(). This component only renders what it receives.
@@ -118,7 +154,9 @@ export function CopilotPanel({
     messagesEndRef.current?.scrollIntoView?.({ behavior: 'smooth' })
   }, [messages, isLoading, streamingContent])
 
-  const normalizedMessages = messages.filter(isMessageLike).map(toAgentMessage)
+  const normalizedMessages = collapseAssistantMessages(
+    messages.filter(isMessageLike).map(toAgentMessage),
+  )
   const showDownloadBar = adapterStatus === 'downloading' && downloadProgress > 0
 
   const blockSendWhileBusy = isLoading && !allowSendWhileBusy
@@ -237,7 +275,11 @@ export function CopilotPanel({
 
       <SuggestionChips
         chips={suggestions}
-        onSelect={(chip) => onSuggestionSelect?.(chip)}
+        disabled={blockSendWhileBusy}
+        onSelect={(chip) => {
+          if (blockSendWhileBusy) return
+          onSuggestionSelect?.(chip)
+        }}
         className="flex-shrink-0 px-3"
       />
 
@@ -245,7 +287,7 @@ export function CopilotPanel({
       <div className="flex flex-shrink-0 gap-2 border-t border-[var(--ns-color-border)] p-3">
         <textarea
           ref={inputRef}
-          placeholder="Ask anything…"
+          placeholder="Ask about signals, risks, or how to optimize the dashboard…"
           rows={2}
           disabled={inputLocked}
           onKeyDown={handleKeyDown}

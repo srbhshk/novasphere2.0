@@ -28,11 +28,11 @@ export function GlassCard({
   return (
     <Comp
       className={cn(
-        'ns-glass-card',
+        'ns-glass-card shadow-accent-500/20 shadow-2xl',
         `ns-glass-card-${variant}`,
         highlight ? 'ns-glass-card-highlight' : undefined,
         hover ? 'ns-glass-card-hover' : undefined,
-        'ns-glass-card-content shadow-2xl',
+        'ns-glass-card-content',
         className,
       )}
       {...rest}

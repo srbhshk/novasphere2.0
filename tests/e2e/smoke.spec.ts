@@ -7,14 +7,18 @@ test('sign in and use copilot smoke flow', async ({ page }) => {
   await page.getByRole('button', { name: /sign in/i }).click()
 
   await expect(page).toHaveURL(/\/dashboard/)
-  await expect(page.getByText('Dashboard')).toBeVisible()
+  await expect(page.getByText('Dashboard', { exact: true }).first()).toBeVisible()
 
   await page
     .getByRole('button', { name: /open copilot|nova/i })
     .first()
     .click()
-  await page.getByPlaceholder(/ask anything/i).fill('Show me what matters most')
+  const prompt = 'Show me what matters most'
+  const input = page.getByRole('textbox', { name: /message/i })
+  await expect(input).toBeVisible()
+  await input.fill(prompt)
   await page.getByRole('button', { name: /send/i }).click()
 
-  await expect(page.getByText(/what matters|layout|signal/i).first()).toBeVisible()
+  await expect(page.getByText(prompt, { exact: true })).toBeVisible()
+  await expect(input).not.toBeDisabled({ timeout: 60_000 })
 })

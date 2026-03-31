@@ -13,6 +13,11 @@
   text-align: left;
 }
 
+.ns-agent-message-content {
+  line-height: 1.45;
+  color: var(--ns-color-text);
+}
+
 .ns-agent-message-system {
   text-align: center;
   padding: 6px 10px;
@@ -51,4 +56,71 @@
   background: var(--ns-glass-bg-subtle);
   border: 1px solid var(--ns-color-border);
   color: var(--ns-color-muted);
+}
+
+/* Markdown typography (assistant only) */
+.ns-agent-md-heading {
+  margin: 0.2rem 0 0.45rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ns-agent-md-paragraph {
+  margin: 0.35rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ns-agent-md-list {
+  margin: 0.35rem 0 0.45rem;
+  padding-left: 1.2rem;
+}
+
+.ns-agent-md-listOrdered {
+  list-style: decimal;
+}
+
+.ns-agent-md-listItem {
+  margin: 0.15rem 0;
+}
+
+/* Inline code: code elements not inside pre */
+.ns-agent-message-content :not(pre) > code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.85em;
+  padding: 0.08rem 0.35rem;
+  border-radius: calc(var(--ns-radius-md) - 2px);
+  background: var(--ns-glass-bg-subtle);
+  border: 1px solid color-mix(in srgb, var(--ns-color-border) 65%, transparent);
+}
+
+.ns-agent-md-codeBlock {
+  margin: 0.5rem 0;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--ns-radius-lg);
+  background: color-mix(in srgb, var(--ns-glass-bg-strong) 80%, #000 20%);
+  border: 1px solid var(--ns-color-border);
+  overflow-x: auto;
+}
+
+.ns-agent-md-codeBlock code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.82rem;
+  color: var(--ns-color-text);
+  white-space: pre;
+}
+
+.ns-agent-md-strong {
+  font-weight: 650;
+}
+
+.ns-agent-md-link {
+  color: var(--ns-color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }

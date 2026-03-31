@@ -18,6 +18,9 @@ export type { GrainOverlayProps } from './GrainOverlay/GrainOverlay'
 export { Skeleton } from './Skeleton/Skeleton'
 export type { SkeletonProps, SkeletonRounded } from './Skeleton/Skeleton'
 
+export { SvgLoader } from './SvgLoader/SvgLoader'
+export type { SvgLoaderProps } from './SvgLoader/SvgLoader'
+
 export { Button } from './ui/button'
 export type { ButtonProps } from './ui/button'
 

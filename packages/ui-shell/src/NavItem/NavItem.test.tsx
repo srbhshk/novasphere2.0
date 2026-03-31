@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 
 import NavItem from './NavItem'
-import styles from './NavItem.module.css'
 
 const exampleItem = {
   id: 'dashboard',
@@ -20,7 +19,7 @@ describe('NavItem', () => {
   it('applies active styles when isActive=true', () => {
     render(<NavItem item={exampleItem} isActive />)
     const link = screen.getByRole('link', { name: /dashboard/i })
-    expect(link.className).toContain(styles.active)
+    expect(link.className).toContain('ns-nav-item--active')
   })
 
   it('renders badge when item.badge is provided', () => {

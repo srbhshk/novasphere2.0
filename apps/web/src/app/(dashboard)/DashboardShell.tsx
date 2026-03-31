@@ -1,13 +1,16 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { getBreadcrumbs } from '@novasphere/tenant-core/breadcrumbs'
 import type { BreadcrumbItem } from '@novasphere/tenant-core/breadcrumbs'
+import { FALLBACK_TENANT } from '@novasphere/tenant-core/tenant.types'
 import type { TenantConfig } from '@novasphere/tenant-core'
+import { novaConfig } from 'nova.config'
 import { AppShell } from '@novasphere/ui-shell'
 import { AuthGuard, UserMenu } from '@novasphere/ui-auth'
 import { AdapterStatusBadge } from '@novasphere/ui-agent'
+import { SvgLoader } from '@novasphere/ui-glass'
 import { useSession } from '@/lib/auth/auth-client'
 import { betterAuthAdapter, toAuthSession } from '@/lib/auth/better-auth-adapter'
 import { useAgentPanelStore } from '@/store/agent.store'
@@ -15,6 +18,7 @@ import { useLayoutStore } from '@/store/layout.store'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
 import { CopilotChatProvider } from './CopilotContext'
 import CopilotDock from './CopilotDock'
+import CopilotCoachmark from './CopilotCoachmark'
 
 type DashboardShellProps = {
   tenant: TenantConfig
@@ -61,7 +65,21 @@ export default function DashboardShell({
   const resetLayout = useLayoutStore((s) => s.resetLayout)
 
   const tenantWithNav = tenantWithPaths(tenant)
-  const breadcrumbs: BreadcrumbItem[] = getBreadcrumbs(pathname, tenant)
+  /** First crumb uses DB `organization.name` when resolved; fallback tenant uses `nova.config` product name (shell never imported it before). */
+  const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
+    const items = getBreadcrumbs(pathname, tenant)
+    if (items.length === 0) return items
+    const first = items[0]
+    const rest = items.slice(1)
+    if (!first) return items
+    const isStaticFallback =
+      tenant.id === FALLBACK_TENANT.id &&
+      tenant.slug === FALLBACK_TENANT.slug &&
+      tenant.name === FALLBACK_TENANT.name
+    const label = isStaticFallback ? novaConfig.product.name : first.label
+    const firstItem: BreadcrumbItem = { href: first.href, label }
+    return [firstItem, ...rest]
+  }, [pathname, tenant])
   const lastCrumb = breadcrumbs[breadcrumbs.length - 1]
   const title = lastCrumb?.label ?? tenant.name
 
@@ -99,7 +117,21 @@ export default function DashboardShell({
     <AuthGuard
       adapter={betterAuthAdapter}
       loading={
-        <div className="p-6 text-sm text-[color:var(--ns-color-muted)]">Loading…</div>
+        <AppShell
+          tenant={tenantWithNav}
+          currentPath={pathname}
+          title={title}
+          breadcrumbs={breadcrumbs}
+          topbarRightSlot={
+            <div className="flex items-center gap-2">
+              <ThemeSwitcher />
+            </div>
+          }
+        >
+          <div className="flex h-full w-full items-center justify-center">
+            <SvgLoader label="Loading dashboard" />
+          </div>
+        </AppShell>
       }
       fallback={<RedirectToSignIn />}
     >
@@ -115,13 +147,14 @@ export default function DashboardShell({
           <div
             className={`min-h-0 ${
               isCopilotOpen
-                ? 'pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
+                ? 'lg:pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
                 : ''
             }`}
           >
             {children}
           </div>
           <CopilotDock />
+          <CopilotCoachmark isCopilotOpen={isCopilotOpen} />
         </AppShell>
       </CopilotChatProvider>
     </AuthGuard>

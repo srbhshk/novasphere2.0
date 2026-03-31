@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from 'react'
 import { Bot, Send, Square, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { AdapterType, AgentStatus, SuggestionChip } from '@novasphere/agent-core'
 import { GlassPanel } from '@novasphere/ui-glass'
 import { AdapterStatusBadge } from '../AdapterStatusBadge/AdapterStatusBadge'
@@ -87,6 +88,42 @@ function toAgentMessage(
   return mapped && mapped.length > 0 ? { ...base, toolCalls: mapped } : base
 }
 
+function collapseAssistantMessages(
+  messages: Array<ReturnType<typeof toAgentMessage>>,
+): Array<ReturnType<typeof toAgentMessage>> {
+  const collapsed: Array<ReturnType<typeof toAgentMessage>> = []
+  for (const message of messages) {
+    const prev = collapsed[collapsed.length - 1]
+    if (!prev) {
+      collapsed.push(message)
+      continue
+    }
+
+    if (prev.role === 'assistant' && message.role === 'assistant') {
+      const prevContent = prev.content.trim()
+      const nextContent = message.content.trim()
+      const mergedContent =
+        prevContent.length > 0 && nextContent.length > 0
+          ? `${prevContent}\n\n${nextContent}`
+          : prevContent.length > 0
+            ? prevContent
+            : nextContent
+      const mergedToolCalls = [...(prev.toolCalls ?? []), ...(message.toolCalls ?? [])]
+
+      collapsed[collapsed.length - 1] = {
+        ...prev,
+        content: mergedContent,
+        timestamp: Math.max(prev.timestamp, message.timestamp),
+        ...(mergedToolCalls.length > 0 ? { toolCalls: mergedToolCalls } : {}),
+      }
+      continue
+    }
+
+    collapsed.push(message)
+  }
+  return collapsed
+}
+
 /**
  * Copilot panel. Intentionally stateless on AI. All AI calls are made in apps/web
  * via AI SDK 6 useChat(). This component only renders what it receives.
@@ -113,12 +150,15 @@ export function CopilotPanel({
 }: CopilotPanelProps): React.JSX.Element {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: 'smooth' })
   }, [messages, isLoading, streamingContent])
 
-  const normalizedMessages = messages.filter(isMessageLike).map(toAgentMessage)
+  const normalizedMessages = collapseAssistantMessages(
+    messages.filter(isMessageLike).map(toAgentMessage),
+  )
   const showDownloadBar = adapterStatus === 'downloading' && downloadProgress > 0
 
   const blockSendWhileBusy = isLoading && !allowSendWhileBusy
@@ -140,28 +180,66 @@ export function CopilotPanel({
 
   if (!isOpen && onOpenChange) {
     return (
-      <button
+      <motion.button
         type="button"
         onClick={() => onOpenChange(true)}
         className={cn(
           [
-            'group relative rounded-2xl border border-[var(--ns-color-border)] p-3',
-            'bg-[radial-gradient(80%_80%_at_30%_20%,var(--ns-color-accent-10),transparent_60%),linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
-            'shadow-[0_18px_50px_rgba(0,0,0,0.45)]',
+            // Primary FAB pill (high contrast; noticeable without animation)
+            'group relative inline-flex items-center gap-2.5 rounded-full border border-[var(--ns-color-border)] px-4 py-3',
+            'bg-[radial-gradient(90%_120%_at_20%_20%,var(--ns-color-accent-20),transparent_58%),linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
+            'shadow-[0_18px_55px_rgba(0,0,0,0.55)]',
             'transition-all duration-200',
-            'hover:-translate-y-0.5 hover:shadow-[0_22px_70px_rgba(0,0,0,0.55)]',
+            'hover:-translate-y-0.5 hover:shadow-[0_24px_80px_rgba(0,0,0,0.6)]',
             'active:translate-y-0 active:shadow-[0_12px_40px_rgba(0,0,0,0.45)]',
             'focus-visible:ring-2 focus-visible:ring-[var(--ns-color-accent)]/50 focus-visible:outline-none',
           ].join(' '),
           className,
         )}
         aria-label="Open copilot"
+        {...(reduceMotion
+          ? {}
+          : {
+              initial: { y: 0, scale: 1 },
+              animate: {
+                y: [0, -2, 0],
+                scale: [1, 1.02, 1],
+              },
+              transition: {
+                duration: 3.6,
+                ease: 'easeInOut' as const,
+                repeat: Number.POSITIVE_INFINITY,
+              },
+            })}
       >
+        {/* Glow plate (static; visible even when motion disabled) */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1 rounded-full bg-[radial-gradient(60%_60%_at_50%_50%,var(--ns-color-accent-20),transparent_70%)] opacity-70 blur-md transition-opacity duration-200 group-hover:opacity-95"
+        />
         <div className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(70%_70%_at_50%_0%,rgba(255,255,255,0.12),transparent_60%)]" />
         </div>
-        <Bot className="relative h-5 w-5 text-[var(--ns-color-text)]" />
-      </button>
+
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ns-color-accent)] shadow-[0_0_0_6px_var(--ns-color-accent-10)]">
+          <Bot className="h-4.5 w-4.5 text-[color:var(--ns-color-bg)]" />
+        </span>
+
+        {/* <span className="relative flex min-w-0 flex-col items-start leading-none">
+          <span className="text-sm font-semibold tracking-wide text-[var(--ns-color-text)]">
+            {label}
+          </span>
+          <span className="text-[11px] tracking-wide text-[var(--ns-color-muted)]">
+            Explain, refine, prioritize
+          </span>
+        </span> */}
+
+        {/* Attention dot (motion-safe only) */}
+        <span
+          aria-hidden="true"
+          className="relative h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[var(--ns-color-accent)] shadow-[0_0_16px_var(--ns-glow-accent)] motion-safe:animate-pulse motion-reduce:animate-none"
+        />
+      </motion.button>
     )
   }
 
@@ -237,7 +315,11 @@ export function CopilotPanel({
 
       <SuggestionChips
         chips={suggestions}
-        onSelect={(chip) => onSuggestionSelect?.(chip)}
+        disabled={blockSendWhileBusy}
+        onSelect={(chip) => {
+          if (blockSendWhileBusy) return
+          onSuggestionSelect?.(chip)
+        }}
         className="flex-shrink-0 px-3"
       />
 
@@ -245,7 +327,7 @@ export function CopilotPanel({
       <div className="flex flex-shrink-0 gap-2 border-t border-[var(--ns-color-border)] p-3">
         <textarea
           ref={inputRef}
-          placeholder="Ask anything…"
+          placeholder="Ask about signals, risks, or how to optimize the dashboard…"
           rows={2}
           disabled={inputLocked}
           onKeyDown={handleKeyDown}

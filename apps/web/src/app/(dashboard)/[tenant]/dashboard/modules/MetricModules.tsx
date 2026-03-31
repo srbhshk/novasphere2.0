@@ -17,7 +17,7 @@ import type { BentoCardModuleProps } from '@novasphere/ui-bento'
 import { Skeleton } from '@novasphere/ui-glass'
 import { useCurrentRole } from '@/hooks/useCurrentRole'
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
-import type { KpiMetric } from '@/mocks/mock.types'
+import type { KpiMetric } from '@/lib/api/contracts'
 import { ModuleWrapper } from './ModuleWrapper'
 
 type MetricCardInnerProps = {

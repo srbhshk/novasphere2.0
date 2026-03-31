@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import type { TenantConfig } from '@novasphere/tenant-core'
 
 import Sidebar from './Sidebar'
-import navItemStyles from '../NavItem/NavItem.module.css'
 
 const tenant: TenantConfig = {
   id: 'demo',
@@ -52,7 +51,7 @@ describe('Sidebar', () => {
       .find((link) => link.getAttribute('href') === '/demo/analytics')
 
     expect(analyticsLink).toBeDefined()
-    expect(analyticsLink?.className).toContain(navItemStyles.active)
+    expect(analyticsLink?.className).toContain('ns-nav-item--active')
   })
 
   it('renders bottomSlot when provided', () => {

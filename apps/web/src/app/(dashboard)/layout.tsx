@@ -1,17 +1,13 @@
-import { headers } from 'next/headers'
-import { resolveTenant } from '@novasphere/tenant-core'
-import DashboardShell from './DashboardShell'
+import type { ReactNode } from 'react'
 
 type DashboardLayoutProps = {
-  children: React.ReactNode
+  children: ReactNode
 }
 
-export default async function DashboardLayout({
-  children,
-}: DashboardLayoutProps): Promise<React.JSX.Element> {
-  const headersList = await headers()
-  const tenantId = headersList.get('x-tenant-id') ?? 'demo'
-  const tenant = await resolveTenant(tenantId)
-
-  return <DashboardShell tenant={tenant}>{children}</DashboardShell>
+/**
+ * Tenant-specific shell (resolveTenant, breadcrumbs) lives in `[tenant]/layout.tsx`
+ * so the slug in the URL drives `resolveTenantBySlug` (matches DB `organization.slug`).
+ */
+export default function DashboardLayout({ children }: DashboardLayoutProps): ReactNode {
+  return children
 }

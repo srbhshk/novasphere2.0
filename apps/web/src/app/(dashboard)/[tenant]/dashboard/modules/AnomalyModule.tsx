@@ -20,6 +20,7 @@ export function AnomalyBannerModule({ config }: BentoCardModuleProps): React.JSX
       : null
 
   const hasExplanation = signals.length > 0 && hypothesis != null && confidence != null
+  const hasSignalsOnly = signals.length > 0 && !hasExplanation
 
   const confidenceColor =
     confidence === 'high'
@@ -66,8 +67,18 @@ export function AnomalyBannerModule({ config }: BentoCardModuleProps): React.JSX
           </>
         ) : (
           <div className="text-sm text-[var(--ns-color-text)]">
-            Churn signal detected. Review pipeline stall in the negotiation stage — 7.8%
-            churn rate is above the 5% threshold.
+            {hasSignalsOnly ? (
+              <>
+                A signal was detected in:{' '}
+                <span className="font-medium">{signals.join(', ')}</span>. Open Copilot to
+                review cross-signal context and recommended next actions.
+              </>
+            ) : (
+              <>
+                A signal was detected. Open Copilot to review context and recommended next
+                actions.
+              </>
+            )}
           </div>
         )}
       </div>

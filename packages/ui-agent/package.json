@@ -26,17 +26,19 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
+    "framer-motion": "^12",
+    "lucide-react": "^0.473.0",
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19",
-    "framer-motion": "^12",
-    "zustand": "^5",
-    "lucide-react": "^0.473.0"
+    "zustand": "^5"
   },
   "dependencies": {
     "@novasphere/agent-core": "workspace:*",
     "@novasphere/tokens": "workspace:*",
     "@novasphere/ui-glass": "workspace:*",
-    "@radix-ui/react-popover": "^1.0.0"
+    "@radix-ui/react-popover": "^1.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "latest",

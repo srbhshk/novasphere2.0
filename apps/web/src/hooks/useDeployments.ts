@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { Deployment } from '@/mocks/mock.types'
+import type { Deployment } from '@/lib/api/contracts'
 import type { AgentRole } from './useCurrentRole'
 
 type DeploymentsResponse = {

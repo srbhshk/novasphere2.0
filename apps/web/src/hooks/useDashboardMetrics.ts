@@ -4,7 +4,7 @@ import type {
   EngineerMetricsResponse,
   AdminMetricsResponse,
   ViewerMetricsResponse,
-} from '@/mocks/mock.types'
+} from '@/lib/api/contracts'
 import type { AgentRole } from './useCurrentRole'
 
 type MetricsByRole = {

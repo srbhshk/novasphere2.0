@@ -12,7 +12,7 @@ import type {
   Deployment,
   SystemAlert,
   DeploymentStatus,
-} from '@/mocks/mock.types'
+} from '@/lib/api/contracts'
 import { ModuleWrapper } from './ModuleWrapper'
 
 function formatTimestamp(iso: string): string {
@@ -64,7 +64,7 @@ export function ActivityFeedModule({ config }: BentoCardModuleProps): React.JSX.
   const wrapperTitle = config.title ? undefined : 'Activity Feed'
   return (
     <ModuleWrapper title={wrapperTitle}>
-      <ScrollArea className="h-full">
+      <ScrollArea className="max-h-[420px]">
         <div className="flex flex-col gap-2">
           {isLoading
             ? Array.from({ length: 4 }, (_, i) => (
@@ -135,7 +135,7 @@ export function DeploymentLogModule({ config }: BentoCardModuleProps): React.JSX
   const wrapperTitle = config.title ? undefined : 'Recent Deployments'
   return (
     <ModuleWrapper title={wrapperTitle}>
-      <ScrollArea className="h-full">
+      <ScrollArea className="max-h-[420px]">
         <div className="flex flex-col gap-2">
           {isLoading
             ? Array.from({ length: 4 }, (_, i) => (
@@ -216,7 +216,7 @@ export function SystemAlertsModule({ config }: BentoCardModuleProps): React.JSX.
   const wrapperTitle = config.title ? undefined : 'System Alerts'
   return (
     <ModuleWrapper title={wrapperTitle}>
-      <ScrollArea className="h-full">
+      <ScrollArea className="max-h-[420px]">
         <div className="flex flex-col gap-2">
           {isLoading
             ? Array.from({ length: 3 }, (_, i) => (

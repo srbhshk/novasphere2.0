@@ -12,7 +12,7 @@ import type {
   PipelineDeal,
   ChurnRisk,
   PipelineDealStage,
-} from '@/mocks/mock.types'
+} from '@/lib/api/contracts'
 import { ModuleWrapper } from './ModuleWrapper'
 
 function formatCurrency(value: number): string {
@@ -172,13 +172,15 @@ export function CustomerTableModule({ config }: BentoCardModuleProps): React.JSX
   const wrapperTitle = config.title ? undefined : 'Top Customers'
   return (
     <ModuleWrapper title={wrapperTitle}>
-      <DataTable<CustomerRow>
-        columns={CUSTOMER_COLUMNS}
-        data={data?.items ?? []}
-        loading={isLoading}
-        emptyMessage="No customers found"
-        skeletonRows={5}
-      />
+      <div className="max-h-[420px] overflow-y-auto">
+        <DataTable<CustomerRow>
+          columns={CUSTOMER_COLUMNS}
+          data={data?.items ?? []}
+          loading={isLoading}
+          emptyMessage="No customers found"
+          skeletonRows={5}
+        />
+      </div>
     </ModuleWrapper>
   )
 }
@@ -190,13 +192,15 @@ export function PipelineTableModule({ config }: BentoCardModuleProps): React.JSX
   const wrapperTitle = config.title ? undefined : 'Active Pipeline'
   return (
     <ModuleWrapper title={wrapperTitle}>
-      <DataTable<PipelineDeal>
-        columns={PIPELINE_COLUMNS}
-        data={deals}
-        loading={isLoading}
-        emptyMessage="No pipeline deals found"
-        skeletonRows={5}
-      />
+      <div className="max-h-[420px] overflow-y-auto">
+        <DataTable<PipelineDeal>
+          columns={PIPELINE_COLUMNS}
+          data={deals}
+          loading={isLoading}
+          emptyMessage="No pipeline deals found"
+          skeletonRows={5}
+        />
+      </div>
     </ModuleWrapper>
   )
 }

@@ -34,6 +34,41 @@ describe('AgentMessage', () => {
     expect(screen.getByText('Hi there')).toBeInTheDocument()
   })
 
+  it('renders basic markdown (bold, list, code fences)', () => {
+    const { container } = render(
+      <AgentMessage
+        message={{
+          id: '4',
+          role: 'assistant',
+          content: [
+            'Here is **bold** text.',
+            '',
+            '- item one',
+            '- item two',
+            '',
+            '```ts',
+            'const x = 1',
+            '```',
+          ].join('\n'),
+          timestamp: Date.now(),
+        }}
+      />,
+    )
+
+    const strong = container.querySelector('strong')
+    expect(strong).toBeTruthy()
+    expect(strong).toHaveTextContent('bold')
+
+    const ul = container.querySelector('ul')
+    expect(ul).toBeTruthy()
+    expect(ul).toHaveTextContent('item one')
+    expect(ul).toHaveTextContent('item two')
+
+    const pre = container.querySelector('pre')
+    expect(pre).toBeTruthy()
+    expect(pre).toHaveTextContent('const x = 1')
+  })
+
   it('adds streaming indicator when isStreaming is true', () => {
     const { container } = render(
       <AgentMessage

@@ -15,6 +15,11 @@
       "types": "./dist/breadcrumbs.d.ts",
       "import": "./dist/breadcrumbs.js",
       "require": "./dist/breadcrumbs.cjs"
+    },
+    "./tenant.types": {
+      "types": "./dist/tenant.types.d.ts",
+      "import": "./dist/tenant.types.js",
+      "require": "./dist/tenant.types.cjs"
     }
   },
   "files": [

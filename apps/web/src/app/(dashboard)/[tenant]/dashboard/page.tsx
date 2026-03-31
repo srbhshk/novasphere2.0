@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
-import { GlassCard, Skeleton } from '@novasphere/ui-glass'
-import { useMetricsList } from '@/hooks/useMetricsList'
+import { GlassCard, Skeleton, Button, Badge } from '@novasphere/ui-glass'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
@@ -14,9 +14,15 @@ import { MODULE_REGISTRY } from './modules/registry'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
-import { classifyUiIntent, requiresToolForIntent } from '@novasphere/agent-core'
+import {
+  buildSignalExplainAndRefinePrompt,
+  classifyUiIntent,
+  requiresToolForIntent,
+} from '@novasphere/agent-core'
 import type { AdapterType } from '@novasphere/agent-core'
-import type { MetricsListResult } from '@/hooks/useMetricsList'
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
+import type { AgentRole } from '@/hooks/useCurrentRole'
+import type { KpiMetric } from '@/lib/api/contracts'
 import { useCopilotChat } from '../../CopilotContext'
 import DashboardErrorBoundary from '../../DashboardErrorBoundary'
 
@@ -358,19 +364,124 @@ function getDefaultLayoutForRole(role: string): BentoLayoutConfig {
   return VIEWER_DEFAULT_LAYOUT
 }
 
+function getRoleAwareFallbackSuggestions(role: AgentRole): SuggestionChip[] {
+  if (role === 'engineer') {
+    return [
+      {
+        id: 'eng-reliability',
+        label: 'Prioritize reliability first',
+        action:
+          'Prioritize error rate, latency, uptime, and unresolved alerts first while keeping the current layout mostly stable.',
+      },
+      {
+        id: 'eng-incidents',
+        label: 'Investigate current incident risks',
+        action:
+          'Focus on current incident risk signals and explain likely root-cause areas using the visible system and deployment data.',
+      },
+      {
+        id: 'eng-balance',
+        label: 'Balance stability and throughput',
+        action:
+          'Balance stability and throughput signals, then recommend the next two engineering priorities from the visible dashboard context.',
+      },
+    ]
+  }
+
+  if (role === 'ceo') {
+    return [
+      {
+        id: 'ceo-board',
+        label: 'Board-level focus',
+        action:
+          'Prioritize board-level signals first: revenue growth, churn, and pipeline health, with concise risk and opportunity highlights.',
+      },
+      {
+        id: 'ceo-growth-risk',
+        label: 'Balance growth and risk',
+        action:
+          'Balance growth opportunities and downside risks from the visible metrics, and recommend what leadership should focus on this week.',
+      },
+      {
+        id: 'ceo-minimal',
+        label: 'Keep changes minimal',
+        action:
+          'Keep visual changes minimal and explain which executive signals matter most right now and why.',
+      },
+    ]
+  }
+
+  if (role === 'admin') {
+    return [
+      {
+        id: 'admin-platform',
+        label: 'Platform health first',
+        action:
+          'Prioritize platform health, tenant operations, and policy-related signals while keeping the current layout mostly stable.',
+      },
+      {
+        id: 'admin-ops',
+        label: 'Focus operational priorities',
+        action:
+          'Focus on operational bottlenecks visible in onboarding, access, and system signals, then suggest immediate next priorities.',
+      },
+      {
+        id: 'admin-balance',
+        label: 'Balance ops and growth',
+        action:
+          'Balance operational reliability and growth signals from the visible data, and explain what should be monitored most closely next.',
+      },
+    ]
+  }
+
+  return [
+    {
+      id: 'viewer-summary',
+      label: 'What matters right now',
+      action:
+        'Summarize what matters most right now from the visible dashboard signals in clear, concise language.',
+    },
+    {
+      id: 'viewer-risks',
+      label: 'Summarize top risks',
+      action:
+        'Summarize the top current risks and trends from the visible data, with a short explanation of likely impact.',
+    },
+    {
+      id: 'viewer-minimal',
+      label: 'Keep layout stable',
+      action:
+        'Keep layout changes minimal and explain which visible signals should get the most attention next.',
+    },
+  ]
+}
+
 function getFirstAnomalousMetric(
-  metrics: MetricsListResult,
+  role: AgentRole,
+  kpis: KpiMetric[],
 ): { metricLabel: string; value: number } | null {
-  if (metrics.churn.anomaly === true) {
-    return { metricLabel: 'Churn', value: metrics.churn.value }
+  const anomalies = kpis.filter((k) => k.anomaly === true)
+  if (anomalies.length === 0) return null
+
+  const rolePriority: ReadonlyArray<string> =
+    role === 'engineer'
+      ? ['api-latency-p99', 'error-rate', 'api-latency-p50', 'uptime', 'request-volume']
+      : role === 'admin'
+        ? ['new-signups', 'active-orgs', 'total-users', 'mrr', 'conversion']
+        : role === 'viewer'
+          ? ['mrr', 'active-users', 'total-users']
+          : ['churn', 'mrr', 'nrr', 'arr', 'conversion']
+
+  const byId = new Map(anomalies.map((k) => [k.id, k]))
+  for (const id of rolePriority) {
+    const found = byId.get(id)
+    if (found) {
+      return { metricLabel: found.label, value: found.value }
+    }
   }
-  if (metrics.mrr.anomaly === true) {
-    return { metricLabel: 'MRR', value: metrics.mrr.value }
-  }
-  if (metrics.activeUsers.anomaly === true) {
-    return { metricLabel: 'Active Users', value: metrics.activeUsers.value }
-  }
-  return null
+
+  const fallback = anomalies[0]
+  return fallback ? { metricLabel: fallback.label, value: fallback.value } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +492,7 @@ export default function DashboardPage(): React.JSX.Element {
   const { data: sessionData, isPending } = useSession()
   const authSession = useMemo(() => toAuthSession(sessionData ?? null), [sessionData])
   const agentRole = normalizeAgentRole(authSession?.role)
-  const hasResolvedSession = !isPending && authSession != null
+  const [signalToastDismissed, setSignalToastDismissed] = useState(false)
 
   const layout = useLayoutStore((s) => s.layout)
   const setLayout = useLayoutStore((s) => s.setLayout)
@@ -394,17 +505,27 @@ export default function DashboardPage(): React.JSX.Element {
   const setAdapterStatus = useAgentPanelStore((s) => s.setAdapterStatus)
   const suggestions = useAgentPanelStore((s) => s.suggestions)
   const processedToolRef = useRef<Set<string>>(new Set())
-  const initialBootstrapSentRef = useRef<boolean>(false)
   const toolRetryCountRef = useRef<number>(0)
 
   const { messages, sendMessage, status } = useCopilotChat()
+  const chatBusy = status === 'streaming' || status === 'submitted'
 
-  // Use legacy hook for anomaly detection only (role-scoped data via useDashboardMetrics in modules)
-  const { data: metricsData, isPending: metricsPending } = useMetricsList(agentRole)
-  const anomalyMetric = useMemo(
-    () => (metricsData != null ? getFirstAnomalousMetric(metricsData) : null),
-    [metricsData],
+  const { data: metricsData, isLoading: metricsPending } = useDashboardMetrics(
+    agentRole,
+    authSession != null,
   )
+  const anomalyMetric = useMemo(() => {
+    const kpis = (metricsData as { kpis?: KpiMetric[] } | undefined)?.kpis
+    return Array.isArray(kpis) ? getFirstAnomalousMetric(agentRole, kpis) : null
+  }, [agentRole, metricsData])
+  const setCopilotOpen = useAgentPanelStore((s) => s.setOpen)
+
+  const shouldShowSignalToast =
+    !signalToastDismissed &&
+    !isPending &&
+    authSession != null &&
+    !metricsPending &&
+    anomalyMetric != null
 
   useEffect(() => {
     let mounted = true
@@ -430,36 +551,6 @@ export default function DashboardPage(): React.JSX.Element {
       mounted = false
     }
   }, [setAdapterType, setAdapterModel, setAdapterStatus])
-
-  // Single bootstrap turn: anomaly + initial layout in one request when data shows an anomaly,
-  // otherwise layout-only. Avoids racing two effects on `messages.length`.
-  useEffect(() => {
-    if (isPending || !hasResolvedSession) return
-    if (metricsPending) return
-    if (status === 'submitted' || status === 'streaming') return
-    if (initialBootstrapSentRef.current) return
-
-    initialBootstrapSentRef.current = true
-    setGenerating(true)
-    if (anomalyMetric != null) {
-      sendMessage({
-        text: `Explain this anomaly: ${anomalyMetric.metricLabel} is ${anomalyMetric.value}. Then compose the initial dashboard layout for this user (role: ${agentRole}) using the render_layout tool with role-appropriate modules.`,
-      })
-    } else {
-      sendMessage({
-        text: 'Compose the initial dashboard layout for this user.',
-      })
-    }
-  }, [
-    agentRole,
-    anomalyMetric,
-    hasResolvedSession,
-    isPending,
-    metricsPending,
-    sendMessage,
-    setGenerating,
-    status,
-  ])
 
   useEffect(() => {
     if (status === 'ready') {
@@ -514,7 +605,26 @@ export default function DashboardPage(): React.JSX.Element {
         if (result.status === 'validation_failed') {
           if (toolRetryCountRef.current < 1) {
             toolRetryCountRef.current += 1
-            sendMessage({ text: result.feedback })
+            setSuggestions([
+              {
+                id: 'tool-retry-focus',
+                label: 'Try focused refinement',
+                action:
+                  'Refine the current layout with valid module IDs and keep the same overall structure.',
+              },
+              {
+                id: 'tool-retry-balanced',
+                label: 'Rebalance layout',
+                action:
+                  'Rebalance the dashboard layout using valid modules and maintain a clean 12-column composition.',
+              },
+              {
+                id: 'tool-retry-anomaly',
+                label: 'Explain anomaly first',
+                action:
+                  'Explain the top anomaly first, then refine the current layout with valid module IDs.',
+              },
+            ])
             continue
           }
 
@@ -525,7 +635,7 @@ export default function DashboardPage(): React.JSX.Element {
         logToolExecutionFailure(toolName, result)
       }
     }
-  }, [messages, setLayout, getLayout, sendMessage, setSuggestions])
+  }, [messages, setLayout, getLayout, setSuggestions])
 
   useEffect(() => {
     const lastUser = [...messages]
@@ -598,29 +708,58 @@ export default function DashboardPage(): React.JSX.Element {
     if (!requiresToolForIntent(intent)) return
     if (suggestions.length > 0) return
 
-    const fallbackSuggestions: SuggestionChip[] = [
-      {
-        id: 'clarify-focus',
-        label: 'Focus on top risks first',
-        action: 'Focus on top risk signals while keeping the current layout.',
-      },
-      {
-        id: 'clarify-balance',
-        label: 'Balance risks and growth',
-        action: 'Balance risk and growth signals in the current layout.',
-      },
-      {
-        id: 'clarify-visual',
-        label: 'Prefer minimal visual changes',
-        action: 'Keep layout changes minimal and explain what changed.',
-      },
-    ]
-    setSuggestions(fallbackSuggestions)
-  }, [messages, setSuggestions, status, suggestions.length])
+    setSuggestions(getRoleAwareFallbackSuggestions(agentRole))
+  }, [agentRole, messages, setSuggestions, status, suggestions.length])
 
   return (
     <div className="min-h-0 w-full">
       <DashboardErrorBoundary>
+        {shouldShowSignalToast ? (
+          <GlassCard
+            variant="strong"
+            className="mb-4 flex w-full items-start justify-between gap-3 p-4"
+          >
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2">
+                <Badge variant="outline">Signal detected</Badge>
+                <div className="truncate text-sm font-medium text-[var(--ns-color-text)]">
+                  {anomalyMetric.metricLabel} anomaly
+                </div>
+              </div>
+              <div className="text-sm text-[color:var(--ns-color-muted)]">
+                A data signal looks unusual. Start an investigation to explain it and
+                refine what the dashboard should prioritize next.
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setSignalToastDismissed(true)}
+                aria-label="Dismiss signal banner"
+                className="h-9 w-9 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={chatBusy}
+                onClick={() => {
+                  if (chatBusy) return
+                  setCopilotOpen(true)
+                  sendMessage({
+                    text: buildSignalExplainAndRefinePrompt({
+                      metricLabel: anomalyMetric.metricLabel,
+                      metricValue: anomalyMetric.value,
+                      role: agentRole,
+                    }),
+                  })
+                }}
+              >
+                Investigate
+              </Button>
+            </div>
+          </GlassCard>
+        ) : null}
         {layout == null && isGenerating ? (
           // Skeleton state: LLM is composing the initial layout
           <div className="grid w-full auto-rows-[minmax(120px,auto)] grid-cols-12 gap-4">

@@ -36,6 +36,28 @@ See root [README.md](../../README.md) for variable meanings. Server-side validat
 
 ---
 
+## Copilot debugging (DEBUG_AGENT)
+
+To emit full-fidelity Copilot logs (including **full system prompts** and **untrimmed request/response**) to stdout:
+
+1. Set `DEBUG_AGENT=true` in `.env.local`
+2. Run the app (`pnpm dev`)
+
+### What you’ll see in logs
+
+- **Turn lifecycle**: `agent_timing_request_received`, `agent_timing_request_validated`, `agent_timing_context_built`, `agent_timing_ai_stream_created`, `agent_timing_stream_returned`
+- **Tool contract** (when tools are expected): `contract_compliant` / `contract_violation`
+- **Off-topic gate**: `agent_relevance_blocked` (the request is handled without tools)
+- **Debug payloads** (only when `DEBUG_AGENT=true`):
+  - `agent_debug_request_body_raw`
+  - `agent_debug_context_built`
+  - `agent_debug_system_prompt`
+  - `agent_debug_stream_output_raw`
+
+Security note: these logs can contain sensitive user content; do not enable in production unless your log pipeline is restricted.
+
+---
+
 ## Directory map
 
 | Path                                 | Purpose                                                                              |

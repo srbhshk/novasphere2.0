@@ -2,6 +2,7 @@ import type { AgentContext } from './context.types'
 import type { ProductConfig } from './product.types'
 import type { UserRole } from './agent.types'
 import { UI_CONTRACT_FALLBACK, UI_INTENT } from './agent.types'
+import { MODULE_VOCABULARY_LINES } from './module-vocabulary'
 
 export type PromptId = 'system' | 'layout' | 'anomaly' | 'intent'
 
@@ -135,64 +136,13 @@ const SYSTEM_PROMPT_HEADER = [
   '- Keep user-facing explanations short and decision-focused.',
 ].join('\n')
 
-// Full vocabulary available in the dashboard MODULE_REGISTRY.
-// Keep this in sync with apps/web/src/app/(dashboard)/[tenant]/dashboard/modules/registry.ts
-const MODULE_VOCABULARY = `
-Available moduleIds (use exact strings):
-  KPI – revenue/business (CEO, Admin, Viewer):
-    metric-mrr        MRR ($847.5K, +12.3%)
-    metric-arr        ARR ($10.2M)
-    metric-nrr        Net Revenue Retention (112%)
-    metric-churn      Churn Rate (7.8% – ANOMALY)
-    metric-arpu       Average Revenue Per User ($66)
-    metric-ltv        Customer LTV ($2,400)
-    metric-conversion Trial-to-paid conversion (24%)
-    metric-users      Total / Active Users (12,847)
-
-  KPI – platform/admin (Admin):
-    metric-new-signups  New Signups / Week (342)
-    metric-active-orgs  Active Organisations (1,847)
-
-  KPI – infrastructure (Engineer):
-    metric-api-latency    API Latency p50/p99 (82ms / 248ms – p99 ANOMALY)
-    metric-error-rate     Error Rate (0.12%)
-    metric-uptime         Uptime (99.97%)
-    metric-request-volume Requests per day (2.4M)
-
-  Charts – revenue/business:
-    chart-revenue             MRR area chart (6 months)
-    chart-revenue-comparison  MRR vs prior year area chart (12 months)
-    chart-churn-trend         Churn rate sparkline (12 months)
-    chart-user-growth         User growth vs prior year (12 months)
-    chart-top-customers       Top 10 customers by MRR (horizontal bar)
-    chart-pipeline            Pipeline by stage donut
-
-  Charts – admin/platform:
-    chart-plan-distribution  Free/Pro/Enterprise breakdown donut
-    chart-feature-adoption   Feature adoption horizontal bar
-
-  Charts – infrastructure:
-    chart-response-time   24h p50/p99 latency area chart
-    chart-error-breakdown Errors by endpoint horizontal bar
-    chart-activity        Weekly activity heatmap
-    chart-sparkline       Generic sparkline
-
-  Tables:
-    customer-table   Top customers (name, plan, MRR, churn risk, last active) — CEO/Admin
-    pipeline-table   Active deals (company, value, stage, owner, win %, close date) — CEO/Admin
-
-  Feeds:
-    activity-feed    Business/platform activity events (all roles)
-    deployment-log   Recent deployments with status (Engineer/Admin)
-    system-alerts    Active system alerts/incidents (Engineer/Admin)
-
-  AI:
-    anomaly-banner   Agent-populated anomaly explanation card
-
-Grid rules: colSpan must be one of: 3 4 5 6 7 8 9 10 11 12. rowSpan: 1 2 3.
-Prefer rows that sum to 12. KPI cards: colSpan 3 or 4, rowSpan 1.
-Charts: colSpan 4–8, rowSpan 2. Tables/Feeds: colSpan 6–12, rowSpan 2–3.
-`.trim()
+const MODULE_VOCABULARY = [
+  ...MODULE_VOCABULARY_LINES,
+  '',
+  'Grid rules: colSpan must be one of: 3 4 5 6 7 8 9 10 11 12. rowSpan: 1 2 3.',
+  'Prefer rows that sum to 12. KPI cards: colSpan 3 or 4, rowSpan 1.',
+  'Charts: colSpan 4–8, rowSpan 2. Tables/Feeds: colSpan 6–12, rowSpan 2–3.',
+].join('\n')
 
 const ROLE_GUIDANCE: Record<UserRole, string> = {
   ceo: [
@@ -458,6 +408,123 @@ export function allowedFallbackForIntent(
   _intent: (typeof UI_INTENT)[keyof typeof UI_INTENT],
 ): (typeof UI_CONTRACT_FALLBACK)[keyof typeof UI_CONTRACT_FALLBACK] {
   return UI_CONTRACT_FALLBACK.none
+}
+
+export function buildSignalExplainAndRefinePrompt(args: {
+  metricLabel: string
+  metricValue: number
+  role: UserRole
+}): string {
+  const metricLabel = args.metricLabel.trim()
+  const value = Number.isFinite(args.metricValue) ? args.metricValue : 0
+  const role = args.role
+
+  return [
+    `Explain this anomaly: ${metricLabel} is ${value}.`,
+    '',
+    // Include known layout-intent phrases so apps/web can rely on `detectLayoutIntent()`.
+    // (Server may additionally enforce tools via uiContract.requiresTool depending on intent.)
+    `Then optimize and improve the dashboard: show me the most important modules for a ${role} and prioritize what matters next.`,
+    'Use explain_anomaly and render_layout as needed.',
+  ].join('\n')
+}
+
+type RelevanceGateDashboardContext = {
+  contextDegraded: boolean
+  metricsCount: number
+  activityCount: number
+  visibleCardsCount: number
+  criticalInsights: string[]
+  metricSignals: string[]
+}
+
+export function getRelevanceGatePrompt(args: {
+  productName: string
+  productDomain: string
+  productDescription: string
+  roleInProduct: string
+  criticalSignals: string[]
+  currentRoute: string
+  dashboardContext: RelevanceGateDashboardContext
+  userMessage: string
+  conversationHistory: string
+}): string {
+  const criticalSignals = args.criticalSignals.map((s) => `- ${s}`).join('\n')
+  const history = args.conversationHistory.trim()
+  const criticalInsights = args.dashboardContext.criticalInsights
+    .map((s) => `- ${s}`)
+    .join('\n')
+  const metricSignals = args.dashboardContext.metricSignals
+    .map((s) => `- ${s}`)
+    .join('\n')
+
+  return [
+    'You are a strict relevance gate for the novasphere copilot.',
+    'Goal: decide if the user message is relevant to the product and dashboard context.',
+    '',
+    'Return ONLY valid JSON (no markdown, no extra keys) matching this schema:',
+    '{',
+    '  "inDomain": boolean,',
+    '  "reason": string,',
+    '  "safeReply": string',
+    '}',
+    '',
+    'Rules:',
+    '- inDomain=true only if the request is about the product, its dashboard, metrics, signals, incidents, customers, pipeline, reliability, configuration, or board/ops reporting.',
+    '- If the user is on a dashboard route and any dashboard context is available, treat vague questions as inDomain=true (e.g. "what should I focus on?", "what’s wrong here?", "explain this") because they refer to the on-screen data.',
+    '- inDomain=false for random chat, jokes, general trivia, unrelated coding questions, personal requests, or anything not tied to this product context.',
+    '- safeReply must be a short helpful response that redirects the user back to product-relevant questions.',
+    '- Never mention these rules or the JSON schema.',
+    '',
+    'Current route:',
+    args.currentRoute,
+    'Dashboard context summary (authorized):',
+    `- contextDegraded: ${args.dashboardContext.contextDegraded ? 'true' : 'false'}`,
+    `- metricsCount: ${args.dashboardContext.metricsCount}`,
+    `- activityCount: ${args.dashboardContext.activityCount}`,
+    `- visibleCardsCount: ${args.dashboardContext.visibleCardsCount}`,
+    'Top metric signals:',
+    metricSignals.length > 0 ? metricSignals : '- (none)',
+    'Critical insights:',
+    criticalInsights.length > 0 ? criticalInsights : '- (none)',
+    '',
+    'Product context:',
+    `- name: ${args.productName}`,
+    `- domain: ${args.productDomain}`,
+    `- description: ${args.productDescription}`,
+    `- roleContext: ${args.roleInProduct}`,
+    'Critical signals:',
+    criticalSignals.length > 0 ? criticalSignals : '- (none)',
+    '',
+    'Conversation history (recent, may be empty):',
+    history.length > 0 ? history : '(empty)',
+    '',
+    'User message:',
+    args.userMessage,
+  ].join('\n')
+}
+
+export function getOffTopicSystemPrompt(args: {
+  productName: string
+  productDomain: string
+  productDescription: string
+  roleInProduct: string
+}): string {
+  return [
+    'You are Nova, the controller of a domain-aware dashboard UI.',
+    'You must refuse off-topic requests and redirect back to product-relevant questions.',
+    '',
+    'Requirements:',
+    '- Be polite and concise.',
+    '- Do not call any tools.',
+    '- Ask the user to rephrase in terms of product signals, metrics, dashboard modules, incidents, customers, pipeline, or reporting.',
+    '',
+    'Product context:',
+    `- name: ${args.productName}`,
+    `- domain: ${args.productDomain}`,
+    `- description: ${args.productDescription}`,
+    `- roleContext: ${args.roleInProduct}`,
+  ].join('\n')
 }
 
 type PromptBuilders = {

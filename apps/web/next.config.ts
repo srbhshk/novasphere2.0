@@ -4,14 +4,13 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: [
-    '@libsql/client',
+    // Keep native/binary optional packages external. These are platform-specific and
+    // should be resolved from the runtime environment when present.
     'libsql',
     '@libsql/darwin-arm64',
     '@libsql/darwin-x64',
     '@libsql/linux-x64-gnu',
     '@libsql/linux-x64-musl',
-    '@neondatabase/serverless',
-    'pg',
   ],
   // Ensure monorepo workspace packages are traced into standalone output on Vercel.
   outputFileTracingRoot: path.join(__dirname, '../..'),

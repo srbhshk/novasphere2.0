@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
     '@novasphere/ui-auth',
     '@novasphere/agent-core',
     '@novasphere/tenant-core',
+    '@novasphere/db',
   ],
   turbopack: {},
   devIndicators: false,

@@ -1,4 +1,4 @@
-import { accounts, sessions, users, verifications } from '@novasphere/db'
+import { accounts, getDb, sessions, users, verifications } from '@novasphere/db'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { betterAuth } from 'better-auth'
@@ -105,10 +105,6 @@ export async function createAuth() {
 async function resolveDatabaseAdapter() {
   try {
     type DrizzleDb = Parameters<typeof drizzleAdapter>[0]
-    const loadModule = new Function('specifier', 'return import(specifier)') as (
-      specifier: string,
-    ) => Promise<{ getDb: () => unknown }>
-    const { getDb } = await loadModule('@novasphere/db')
     const runtimeDb = getDb()
     // Safe: @novasphere/db exports Drizzle database instance via getDb().
     return drizzleAdapter(runtimeDb as DrizzleDb, {
@@ -131,7 +127,9 @@ async function resolveDatabaseAdapter() {
       'Fix: ensure @novasphere/db can be imported at runtime and DATABASE_URL is set correctly.\n'
 
     if (shouldRequireDb) {
-      throw new Error(error instanceof Error ? error.message : message)
+      const detail =
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      throw new Error(`${message}\nCaused by: ${detail}`)
     }
 
     // Build/runtime fallback when DB driver modules are unavailable.

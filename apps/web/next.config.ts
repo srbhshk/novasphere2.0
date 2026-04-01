@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -7,9 +8,13 @@ const nextConfig: NextConfig = {
     'libsql',
     '@libsql/darwin-arm64',
     '@libsql/darwin-x64',
+    '@libsql/linux-x64-gnu',
+    '@libsql/linux-x64-musl',
     '@neondatabase/serverless',
     'pg',
   ],
+  // Ensure monorepo workspace packages are traced into standalone output on Vercel.
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   transpilePackages: [
     '@novasphere/tokens',
     '@novasphere/ui-glass',

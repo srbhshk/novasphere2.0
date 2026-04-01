@@ -14,7 +14,8 @@ export type AgentMessageProps = {
 }
 
 function formatTime(timestamp: number): string {
-  const d = new Date(timestamp)
+  const safe = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()
+  const d = new Date(safe)
   const h = d.getHours()
   const m = d.getMinutes()
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`

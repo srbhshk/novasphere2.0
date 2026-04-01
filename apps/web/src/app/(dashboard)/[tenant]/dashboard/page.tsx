@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { BentoLayoutConfig } from '@novasphere/ui-bento'
 import { BentoGrid } from '@novasphere/ui-bento'
-import { GlassCard, Skeleton, Button, Badge } from '@novasphere/ui-glass'
+import { GlassCard, Skeleton } from '@novasphere/ui-glass'
 import { useLayoutStore } from '@/store/layout.store'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { executeToolCall, logToolExecutionFailure } from '@/lib/agent/genui/tool-executor'
@@ -14,15 +13,10 @@ import { MODULE_REGISTRY } from './modules/registry'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
 import type { SuggestionChip } from '@novasphere/agent-core'
-import {
-  buildSignalExplainAndRefinePrompt,
-  classifyUiIntent,
-  requiresToolForIntent,
-} from '@novasphere/agent-core'
+import { classifyUiIntent, requiresToolForIntent } from '@novasphere/agent-core'
 import type { AdapterType } from '@novasphere/agent-core'
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics'
 import type { AgentRole } from '@/hooks/useCurrentRole'
-import type { KpiMetric } from '@/lib/api/contracts'
 import { useCopilotChat } from '../../CopilotContext'
 import DashboardErrorBoundary from '../../DashboardErrorBoundary'
 
@@ -456,43 +450,14 @@ function getRoleAwareFallbackSuggestions(role: AgentRole): SuggestionChip[] {
   ]
 }
 
-function getFirstAnomalousMetric(
-  role: AgentRole,
-  kpis: KpiMetric[],
-): { metricLabel: string; value: number } | null {
-  const anomalies = kpis.filter((k) => k.anomaly === true)
-  if (anomalies.length === 0) return null
-
-  const rolePriority: ReadonlyArray<string> =
-    role === 'engineer'
-      ? ['api-latency-p99', 'error-rate', 'api-latency-p50', 'uptime', 'request-volume']
-      : role === 'admin'
-        ? ['new-signups', 'active-orgs', 'total-users', 'mrr', 'conversion']
-        : role === 'viewer'
-          ? ['mrr', 'active-users', 'total-users']
-          : ['churn', 'mrr', 'nrr', 'arr', 'conversion']
-
-  const byId = new Map(anomalies.map((k) => [k.id, k]))
-  for (const id of rolePriority) {
-    const found = byId.get(id)
-    if (found) {
-      return { metricLabel: found.label, value: found.value }
-    }
-  }
-
-  const fallback = anomalies[0]
-  return fallback ? { metricLabel: fallback.label, value: fallback.value } : null
-}
-
 // ---------------------------------------------------------------------------
 // Dashboard page
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage(): React.JSX.Element {
-  const { data: sessionData, isPending } = useSession()
+  const { data: sessionData } = useSession()
   const authSession = useMemo(() => toAuthSession(sessionData ?? null), [sessionData])
   const agentRole = normalizeAgentRole(authSession?.role)
-  const [signalToastDismissed, setSignalToastDismissed] = useState(false)
 
   const layout = useLayoutStore((s) => s.layout)
   const setLayout = useLayoutStore((s) => s.setLayout)
@@ -507,25 +472,9 @@ export default function DashboardPage(): React.JSX.Element {
   const processedToolRef = useRef<Set<string>>(new Set())
   const toolRetryCountRef = useRef<number>(0)
 
-  const { messages, sendMessage, status } = useCopilotChat()
-  const chatBusy = status === 'streaming' || status === 'submitted'
+  const { messages, status } = useCopilotChat()
 
-  const { data: metricsData, isLoading: metricsPending } = useDashboardMetrics(
-    agentRole,
-    authSession != null,
-  )
-  const anomalyMetric = useMemo(() => {
-    const kpis = (metricsData as { kpis?: KpiMetric[] } | undefined)?.kpis
-    return Array.isArray(kpis) ? getFirstAnomalousMetric(agentRole, kpis) : null
-  }, [agentRole, metricsData])
-  const setCopilotOpen = useAgentPanelStore((s) => s.setOpen)
-
-  const shouldShowSignalToast =
-    !signalToastDismissed &&
-    !isPending &&
-    authSession != null &&
-    !metricsPending &&
-    anomalyMetric != null
+  useDashboardMetrics(agentRole, authSession != null)
 
   useEffect(() => {
     let mounted = true
@@ -714,52 +663,6 @@ export default function DashboardPage(): React.JSX.Element {
   return (
     <div className="min-h-0 w-full">
       <DashboardErrorBoundary>
-        {shouldShowSignalToast ? (
-          <GlassCard
-            variant="strong"
-            className="mb-4 flex w-full items-start justify-between gap-3 p-4"
-          >
-            <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-2">
-                <Badge variant="outline">Signal detected</Badge>
-                <div className="truncate text-sm font-medium text-[var(--ns-color-text)]">
-                  {anomalyMetric.metricLabel} anomaly
-                </div>
-              </div>
-              <div className="text-sm text-[color:var(--ns-color-muted)]">
-                A data signal looks unusual. Start an investigation to explain it and
-                refine what the dashboard should prioritize next.
-              </div>
-            </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setSignalToastDismissed(true)}
-                aria-label="Dismiss signal banner"
-                className="h-9 w-9 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={chatBusy}
-                onClick={() => {
-                  if (chatBusy) return
-                  setCopilotOpen(true)
-                  sendMessage({
-                    text: buildSignalExplainAndRefinePrompt({
-                      metricLabel: anomalyMetric.metricLabel,
-                      metricValue: anomalyMetric.value,
-                      role: agentRole,
-                    }),
-                  })
-                }}
-              >
-                Investigate
-              </Button>
-            </div>
-          </GlassCard>
-        ) : null}
         {layout == null && isGenerating ? (
           // Skeleton state: LLM is composing the initial layout
           <div className="grid w-full auto-rows-[minmax(120px,auto)] grid-cols-12 gap-4">

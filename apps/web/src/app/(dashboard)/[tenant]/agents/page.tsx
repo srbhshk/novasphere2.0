@@ -3,6 +3,7 @@
 import { Bot } from 'lucide-react'
 import { GlassCard } from '@novasphere/ui-glass'
 import { AdapterStatusBadge } from '@novasphere/ui-agent'
+import { novaConfig } from 'nova.config'
 import { useAgentPanelStore } from '@/store/agent.store'
 
 export default function AgentsPage(): React.JSX.Element {
@@ -26,16 +27,18 @@ export default function AgentsPage(): React.JSX.Element {
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        <GlassCard variant="medium" className="col-span-12 p-5 xl:col-span-4">
-          <div className="mb-3 text-xs font-semibold tracking-widest text-[var(--ns-color-muted)] uppercase">
-            Runtime Status
-          </div>
-          <AdapterStatusBadge
-            adapterType={adapterType ?? 'ollama'}
-            modelName={adapterModel}
-            status={adapterStatus}
-          />
-        </GlassCard>
+        {novaConfig.agent.showAdapterStatus ? (
+          <GlassCard variant="medium" className="col-span-12 p-5 xl:col-span-4">
+            <div className="mb-3 text-xs font-semibold tracking-widest text-[var(--ns-color-muted)] uppercase">
+              Runtime Status
+            </div>
+            <AdapterStatusBadge
+              adapterType={adapterType ?? 'ollama'}
+              modelName={adapterModel}
+              status={adapterStatus}
+            />
+          </GlassCard>
+        ) : null}
 
         <GlassCard variant="medium" className="col-span-12 p-5 xl:col-span-8">
           <div className="mb-3 text-xs font-semibold tracking-widest text-[var(--ns-color-muted)] uppercase">

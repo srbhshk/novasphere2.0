@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import DashboardProviders from './DashboardProviders'
 
 type DashboardLayoutProps = {
   children: ReactNode
@@ -9,5 +10,5 @@ type DashboardLayoutProps = {
  * so the slug in the URL drives `resolveTenantBySlug` (matches DB `organization.slug`).
  */
 export default function DashboardLayout({ children }: DashboardLayoutProps): ReactNode {
-  return children
+  return <DashboardProviders>{children}</DashboardProviders>
 }

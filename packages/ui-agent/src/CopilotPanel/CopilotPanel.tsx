@@ -43,6 +43,8 @@ export type CopilotPanelProps = {
   onSend: (message: string) => void
   onSuggestionSelect?: (chip: SuggestionChip) => void
   onAdapterInfoClick?: () => void
+  /** When true, shows the adapter runtime badge in the header. */
+  showAdapterStatus?: boolean
   isOpen?: boolean
   onOpenChange?: (open: boolean) => void
   agentName?: string
@@ -143,6 +145,7 @@ export function CopilotPanel({
   onSend,
   onSuggestionSelect,
   onAdapterInfoClick,
+  showAdapterStatus = false,
   isOpen = true,
   onOpenChange,
   agentName = 'Nova',
@@ -255,13 +258,15 @@ export function CopilotPanel({
             <Bot className="h-4 w-4 text-white" />
           </div>
           <span className="font-medium text-[var(--ns-color-text)]">{agentName}</span>
-          <AdapterStatusBadge
-            adapterType={adapterType}
-            status={adapterStatus}
-            modelName={adapterModel}
-            downloadProgress={downloadProgress}
-            {...(onAdapterInfoClick ? { onInfoClick: onAdapterInfoClick } : {})}
-          />
+          {showAdapterStatus ? (
+            <AdapterStatusBadge
+              adapterType={adapterType}
+              status={adapterStatus}
+              modelName={adapterModel}
+              downloadProgress={downloadProgress}
+              {...(onAdapterInfoClick ? { onInfoClick: onAdapterInfoClick } : {})}
+            />
+          ) : null}
         </div>
         {onOpenChange && (
           <button

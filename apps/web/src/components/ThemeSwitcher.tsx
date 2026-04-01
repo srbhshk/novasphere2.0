@@ -101,44 +101,73 @@ export default function ThemeSwitcher(): React.JSX.Element {
     [sessionData],
   )
 
+  const { currentIndex, currentMeta, nextPreset, nextMeta } = React.useMemo(() => {
+    const order: readonly ThemePreset[] =
+      THEME_PRESET_ORDER.length > 0 ? THEME_PRESET_ORDER : (['nova-dark'] as const)
+    const idx = Math.max(0, order.indexOf(active))
+    const currentId = order[idx] ?? 'nova-dark'
+    const nextId = order[(idx + 1) % order.length] ?? 'nova-dark'
+    const current = THEME_PRESETS[currentId]
+    const next = THEME_PRESETS[nextId]
+    return {
+      currentIndex: idx,
+      currentMeta: current,
+      nextPreset: nextId,
+      nextMeta: next,
+    }
+  }, [active])
+
   return (
-    <div
-      className="flex items-center gap-1.5"
-      role="radiogroup"
-      aria-label="Dashboard color theme"
+    <button
+      type="button"
+      onClick={() => onSelect(nextPreset)}
+      className={[
+        'group relative inline-flex h-9 items-center gap-2 rounded-full border border-[var(--ns-color-border)] px-3',
+        'bg-[linear-gradient(180deg,var(--ns-glass-bg-strong),var(--ns-glass-bg-subtle))]',
+        'shadow-[0_10px_35px_rgba(0,0,0,0.35)]',
+        'transition-all duration-200',
+        'hover:-translate-y-0.5 hover:shadow-[0_16px_55px_rgba(0,0,0,0.45)]',
+        'focus-visible:ring-2 focus-visible:ring-[color:var(--ns-color-accent)]/60 focus-visible:outline-none',
+      ].join(' ')}
+      aria-label={`Theme: ${currentMeta.name}. Activate to switch to ${nextMeta.name}.`}
+      title={`Theme: ${currentMeta.name} → ${nextMeta.name}`}
     >
-      {THEME_PRESET_ORDER.map((id) => {
-        const meta = THEME_PRESETS[id]
-        const selected = active === id
-        return (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            title={meta.name}
-            onClick={() => {
-              onSelect(id)
-            }}
-            className="relative size-7 shrink-0 rounded-full border border-[color:var(--ns-color-border)] shadow-sm transition-[transform,box-shadow] duration-[var(--ns-duration-base)] ease-[var(--ns-ease-smooth)] hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ns-color-accent)]"
-            style={{
-              background: `linear-gradient(135deg, ${meta.bgHex} 55%, ${meta.accentHex} 100%)`,
-            }}
-          >
-            {selected ? (
-              <span className="sr-only">{`${meta.name} (selected)`}</span>
-            ) : (
-              <span className="sr-only">{meta.name}</span>
-            )}
-            {selected ? (
-              <span
-                className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[color:var(--ns-color-accent)] ring-offset-2 ring-offset-[color:var(--ns-color-bg)]"
-                aria-hidden
-              />
-            ) : null}
-          </button>
-        )
-      })}
-    </div>
+      {/* Glow plate */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-1 rounded-full bg-[radial-gradient(60%_60%_at_30%_30%,var(--ns-color-accent-20),transparent_70%)] opacity-70 blur-md transition-opacity duration-200 group-hover:opacity-95"
+      />
+
+      {/* Current theme chip */}
+      <span
+        className="relative h-5 w-5 rounded-full border border-[color:var(--ns-color-border)] shadow-sm"
+        aria-hidden="true"
+        style={{
+          background: `linear-gradient(135deg, ${currentMeta.bgHex} 55%, ${currentMeta.accentHex} 100%)`,
+        }}
+      />
+
+      <span className="relative flex min-w-0 items-baseline gap-2">
+        <span className="truncate text-xs font-semibold tracking-wide text-[var(--ns-color-text)]">
+          {currentMeta.name}
+        </span>
+        <span className="hidden text-[11px] tracking-wide text-[var(--ns-color-muted)] sm:inline">
+          Theme
+        </span>
+      </span>
+
+      {/* Next preview dot + step indicator */}
+      <span className="relative ml-1 flex items-center gap-2" aria-hidden="true">
+        <span
+          className="h-3 w-3 rounded-full border border-[color:var(--ns-color-border-subtle)] opacity-80"
+          style={{
+            background: `linear-gradient(135deg, ${nextMeta.bgHex} 55%, ${nextMeta.accentHex} 100%)`,
+          }}
+        />
+        <span className="text-[10px] text-[var(--ns-color-muted)] tabular-nums">
+          {currentIndex + 1}/{THEME_PRESET_ORDER.length}
+        </span>
+      </span>
+    </button>
   )
 }

@@ -15,8 +15,10 @@ import { useSession } from '@/lib/auth/auth-client'
 import { betterAuthAdapter, toAuthSession } from '@/lib/auth/better-auth-adapter'
 import { useAgentPanelStore } from '@/store/agent.store'
 import { useLayoutStore } from '@/store/layout.store'
+import { useNotificationsStore } from '@/store/notifications.store'
+import { layoutStorageKey } from '@/store/layout-persistence'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
-import { CopilotChatProvider } from './CopilotContext'
+import NotificationBell from '@/components/NotificationBell'
 import CopilotDock from './CopilotDock'
 import CopilotCoachmark from './CopilotCoachmark'
 
@@ -45,6 +47,16 @@ function RedirectToSignIn(): React.JSX.Element {
   )
 }
 
+function normalizeAgentRole(
+  role: string | undefined,
+): 'admin' | 'ceo' | 'engineer' | 'viewer' {
+  const r = role?.trim().toLowerCase()
+  if (r === 'admin' || r === 'ceo' || r === 'engineer' || r === 'viewer') {
+    return r
+  }
+  return 'viewer'
+}
+
 export default function DashboardShell({
   tenant,
   children,
@@ -52,6 +64,7 @@ export default function DashboardShell({
   const pathname = usePathname() ?? '/'
   const { data: sessionData } = useSession()
   const session = toAuthSession(sessionData ?? null)
+  const role = normalizeAgentRole(session?.role)
   const adapterType = useAgentPanelStore((s) => s.adapterType)
   const adapterModel = useAgentPanelStore((s) => s.adapterModel)
   const adapterStatus = useAgentPanelStore((s) => s.adapterStatus)
@@ -63,6 +76,19 @@ export default function DashboardShell({
   const isCopilotOpen = useAgentPanelStore((s) => s.isOpen)
 
   const resetLayout = useLayoutStore((s) => s.resetLayout)
+  const hydrateLayout = useLayoutStore((s) => s.hydrate)
+  const clearNotifications = useNotificationsStore((s) => s.clearAll)
+  const getNotificationsKey = useNotificationsStore((s) => s.getStorageKey)
+  const notificationsKey = useMemo(
+    () =>
+      getNotificationsKey(session?.userId ?? 'anonymous', session?.tenantId ?? 'demo'),
+    [getNotificationsKey, session?.tenantId, session?.userId],
+  )
+
+  useEffect(() => {
+    if (!session?.userId || !session?.tenantId) return
+    hydrateLayout(layoutStorageKey(session.userId, session.tenantId))
+  }, [hydrateLayout, session?.tenantId, session?.userId])
 
   const tenantWithNav = tenantWithPaths(tenant)
   /** First crumb uses DB `organization.name` when resolved; fallback tenant uses `nova.config` product name (shell never imported it before). */
@@ -89,18 +115,29 @@ export default function DashboardShell({
     setSuggestions([])
     setAdapterStatus('idle')
     setDownloadProgress(0)
+    if (session?.userId) {
+      clearNotifications(notificationsKey)
+    }
     window.location.href = '/sign-in'
   }
 
   const topbarRightSlot = (
     <div className="flex items-center gap-2">
       <ThemeSwitcher />
-      <AdapterStatusBadge
-        adapterType={adapterType}
-        status={adapterStatus}
-        modelName={adapterModel}
-        downloadProgress={downloadProgress}
+      <NotificationBell
+        userId={session?.userId ?? 'anonymous'}
+        tenantId={session?.tenantId ?? 'demo'}
+        role={role}
+        enabled={session != null}
       />
+      {novaConfig.agent.showAdapterStatus ? (
+        <AdapterStatusBadge
+          adapterType={adapterType}
+          status={adapterStatus}
+          modelName={adapterModel}
+          downloadProgress={downloadProgress}
+        />
+      ) : null}
       <UserMenu
         adapter={betterAuthAdapter}
         session={session}
@@ -135,28 +172,26 @@ export default function DashboardShell({
       }
       fallback={<RedirectToSignIn />}
     >
-      <CopilotChatProvider>
-        <AppShell
-          tenant={tenantWithNav}
-          currentPath={pathname}
-          title={title}
-          breadcrumbs={breadcrumbs}
-          topbarRightSlot={topbarRightSlot}
-          sidebarBottomSlot={sidebarBottomSlot}
+      <AppShell
+        tenant={tenantWithNav}
+        currentPath={pathname}
+        title={title}
+        breadcrumbs={breadcrumbs}
+        topbarRightSlot={topbarRightSlot}
+        sidebarBottomSlot={sidebarBottomSlot}
+      >
+        <div
+          className={`min-h-0 ${
+            isCopilotOpen
+              ? 'lg:pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
+              : ''
+          }`}
         >
-          <div
-            className={`min-h-0 ${
-              isCopilotOpen
-                ? 'lg:pr-[calc(var(--ns-copilot-width)+var(--ns-copilot-gap))]'
-                : ''
-            }`}
-          >
-            {children}
-          </div>
-          <CopilotDock />
-          <CopilotCoachmark isCopilotOpen={isCopilotOpen} />
-        </AppShell>
-      </CopilotChatProvider>
+          {children}
+        </div>
+        <CopilotDock />
+        <CopilotCoachmark isCopilotOpen={isCopilotOpen} />
+      </AppShell>
     </AuthGuard>
   )
 }

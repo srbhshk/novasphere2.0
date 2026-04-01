@@ -120,7 +120,7 @@ async function resolveDatabaseAdapter() {
         verification: verifications,
       },
     })
-  } catch {
+  } catch (error) {
     const shouldRequireDb =
       typeof process.env['DATABASE_URL'] === 'string' &&
       process.env['DATABASE_URL'].length > 0
@@ -131,7 +131,7 @@ async function resolveDatabaseAdapter() {
       'Fix: ensure @novasphere/db can be imported at runtime and DATABASE_URL is set correctly.\n'
 
     if (shouldRequireDb) {
-      throw new Error(message)
+      throw new Error(error instanceof Error ? error.message : message)
     }
 
     // Build/runtime fallback when DB driver modules are unavailable.

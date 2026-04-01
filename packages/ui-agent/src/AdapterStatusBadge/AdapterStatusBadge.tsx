@@ -13,9 +13,9 @@ export type AdapterStatusBadgeProps = {
 }
 
 function getLabel(props: AdapterStatusBadgeProps): string {
-  const { adapterType, status, modelName } = props
+  const { adapterType, status } = props
   if (status === 'checking') return 'Detecting AI engine…'
-  if (adapterType === 'ollama') return `Local · ${modelName ?? 'Ollama'}`
+  if (adapterType === 'ollama') return 'Local'
   if (adapterType === 'claude') return 'Claude'
   if (adapterType === 'openai') return 'GPT'
   if (adapterType === 'mock') return 'Demo mode'
@@ -34,12 +34,12 @@ function getDotColor(adapterType: AdapterType | null, status: AgentStatus): stri
 export function AdapterStatusBadge({
   adapterType,
   status,
-  modelName,
+  modelName: _modelName,
   downloadProgress = 0,
   onInfoClick,
   className,
 }: AdapterStatusBadgeProps): React.JSX.Element {
-  const label = getLabel({ adapterType, status, modelName, downloadProgress })
+  const label = getLabel({ adapterType, status, modelName: null, downloadProgress })
   const dotColor = getDotColor(adapterType, status)
   const isChecking = status === 'checking'
   const isMock = adapterType === 'mock'

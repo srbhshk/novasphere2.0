@@ -3,35 +3,63 @@ alwaysApply: true
 ---
 
 # =============================================================================
+
 # NOVASPHERE — CURSOR RULES v1.0.0
+
 # =============================================================================
+
 # Project     : novasphere
+
 # Stack date  : March 2026
-# Description : A domain-aware, AI-native SaaS dashboard framework.
-#               The LLM is the controller. The UI is its output.
-#               Product context + user role + live data = composed interface.
+
+# Description : A domain-aware, AI-native SaaS dashboard framework
+
+# The LLM is the controller. The UI is its output
+
+# Product context + user role + live data = composed interface
+
 # =============================================================================
+
 #
+
 # PURPOSE OF THIS FILE
+
 # --------------------
+
 # This is the single source of truth for Cursor AI. Every architectural
-# decision is recorded here. Cursor must treat this file as law.
+
+# decision is recorded here. Cursor must treat this file as law
+
 #
-# Cursor must NEVER:
-#   - Invent patterns not described here
-#   - Add dependencies not in the approved stack
-#   - Use `any` in TypeScript — ever
-#   - Generate placeholder content in production code paths
-#   - Cross package boundaries that are forbidden (Section 3)
-#   - Create files outside the structure in Section 4
-#   - Inline prompts — all prompts live in agent-core/src/prompts.ts
-#   - Write untyped event handlers, stores, or API responses
+
+# Cursor must NEVER
+
+# - Invent patterns not described here
+
+# - Add dependencies not in the approved stack
+
+# - Use `any` in TypeScript — ever
+
+# - Generate placeholder content in production code paths
+
+# - Cross package boundaries that are forbidden (Section 3)
+
+# - Create files outside the structure in Section 4
+
+# - Inline prompts — all prompts live in agent-core/src/prompts.ts
+
+# - Write untyped event handlers, stores, or API responses
+
 #
-# When in doubt: STOP and ask. Never guess.
+
+# When in doubt: STOP and ask. Never guess
+
 # =============================================================================
 
 # =============================================================================
+
 # 1. PRODUCT IDENTITY
+
 # =============================================================================
 
 product:
@@ -70,18 +98,26 @@ product:
     demo_and_production: Docker Compose (Next.js + Ollama in same stack)
     dev: run Next.js and Ollama separately (pnpm dev + ollama serve)
     key_rule: >
-      OLLAMA_BASE_URL in Docker Compose = http://ollama:11434 (service name)
-      OLLAMA_BASE_URL in dev           = http://localhost:11434
+      OLLAMA_BASE_URL in Docker Compose = <http://ollama:11434> (service name)
+      OLLAMA_BASE_URL in dev           = <http://localhost:11434>
       Never hardcode either — always read from env.
 
 # =============================================================================
+
 # 2. DOMAIN-AWARE PRODUCT CONFIGURATION
+
 # =============================================================================
-# This is the key architectural differentiator.
-# nova.config.ts tells the LLM what product it is operating in.
+
+# This is the key architectural differentiator
+
+# nova.config.ts tells the LLM what product it is operating in
+
 # Without this, "Engineer" means nothing. With it, the LLM knows
-# exactly what an engineer cares about in THIS product.
-# Zero extra latency — static import, no DB call, injected into system prompt.
+
+# exactly what an engineer cares about in THIS product
+
+# Zero extra latency — static import, no DB call, injected into system prompt
+
 # =============================================================================
 
 product_config:
@@ -120,7 +156,9 @@ product_config:
     - Teams replace it with their own config to get domain awareness
 
 # =============================================================================
+
 # 3. MONOREPO ARCHITECTURE
+
 # =============================================================================
 
 monorepo:
@@ -300,7 +338,9 @@ monorepo:
       tsup warns if wrong. That warning is treated as a build error here.
 
 # =============================================================================
+
 # 4. APPROVED TECH STACK — March 2026
+
 # =============================================================================
 
 stack:
@@ -457,8 +497,8 @@ stack:
     model: qwen2.5:0.5b
     api: OpenAI-compatible at OLLAMA_BASE_URL/v1
     health: GET OLLAMA_BASE_URL/api/tags
-    docker_service_url: "http://ollama:11434"
-    dev_url: "http://localhost:11434"
+    docker_service_url: "<http://ollama:11434>"
+    dev_url: "<http://localhost:11434>"
 
   genui_tools:
     location: apps/web/src/lib/genui/tools.ts
@@ -519,7 +559,9 @@ stack:
   node_version: ">=20"
 
 # =============================================================================
+
 # 5. REPOSITORY STRUCTURE
+
 # =============================================================================
 
 structure: |
@@ -674,7 +716,9 @@ structure: |
   └── README.md
 
 # =============================================================================
+
 # 6. DOCKER & DEPLOYMENT
+
 # =============================================================================
 
 docker:
@@ -688,10 +732,10 @@ docker:
     next_output: standalone (required — set in next.config.ts)
     env:
       DATABASE_URL: "file:./data/app.db"
-      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_BASE_URL: "<http://ollama:11434>"
       OLLAMA_MODEL: "qwen2.5:0.5b"
       BETTER_AUTH_SECRET: "change-me-32-chars"
-      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NEXT_PUBLIC_APP_URL: "<http://localhost:3000>"
     volumes: [db_data:/app/data]
     depends_on: ollama (health check)
 
@@ -700,7 +744,7 @@ docker:
     volumes: [ollama_models:/root/.ollama]
     startup: >
       ollama serve in background, sleep 5, ollama pull qwen2.5:0.5b, wait
-    healthcheck: "curl -f http://localhost:11434/api/tags"
+    healthcheck: "curl -f <http://localhost:11434/api/tags>"
     start_period: 30s (model pull on first run)
 
   dockerfile:
@@ -712,10 +756,12 @@ docker:
   dev_workflow: >
     ollama serve (separate terminal)
     pnpm dev (from apps/web or root)
-    OLLAMA_BASE_URL=http://localhost:11434 in .env.local
+    OLLAMA_BASE_URL=<http://localhost:11434> in .env.local
 
 # =============================================================================
+
 # 7. ENVIRONMENT VARIABLES
+
 # =============================================================================
 
 env:
@@ -723,7 +769,7 @@ env:
 
   variables: |
     # App
-    NEXT_PUBLIC_APP_URL          # http://localhost:3000
+    NEXT_PUBLIC_APP_URL          # <http://localhost:3000>
     NEXT_PUBLIC_DATA_SOURCE      # mock | api  (default: mock)
 
     # Database
@@ -749,7 +795,9 @@ env:
     RATE_LIMIT_AGENT_RPM         # default: 20
 
 # =============================================================================
+
 # 8. NAMING CONVENTIONS
+
 # =============================================================================
 
 naming:
@@ -783,7 +831,9 @@ naming:
                ui-charts, ui-auth, ui-agent, ui-shell, web, docker, genui]
 
 # =============================================================================
+
 # 9. PACKAGE.JSON TEMPLATE
+
 # =============================================================================
 
 package_json_template: |
@@ -816,14 +866,17 @@ package_json_template: |
   }
 
 rules:
-  - "types" in exports MUST be first
-  - license is UNLICENSED until explicitly changed
-  - peerDependencies: react, react-dom, framework libs (NOT bundled)
-  - dependencies: @novasphere/* workspace deps only
-  - devDependencies: tsup, typescript, vitest, RTL, @testing-library/jest-dom
+
+- "types" in exports MUST be first
+- license is UNLICENSED until explicitly changed
+- peerDependencies: react, react-dom, framework libs (NOT bundled)
+- dependencies: @novasphere/* workspace deps only
+- devDependencies: tsup, typescript, vitest, RTL, @testing-library/jest-dom
 
 # =============================================================================
+
 # 10. CURSOR BEHAVIOUR
+
 # =============================================================================
 
 cursor_behaviour:
@@ -859,5 +912,7 @@ cursor_behaviour:
     - Never commit secrets or .env.local
 
 # =============================================================================
+
 # END — novasphere v1.0.0 — March 2026
+
 # =============================================================================

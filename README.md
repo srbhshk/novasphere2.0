@@ -228,12 +228,13 @@ Breaking these boundaries breaks the intended layering and CI expectations.
 
 1. **Read boundaries** in [`.cursor/rules/novasphere-rules.mdc`](.cursor/rules/novasphere-rules.mdc) before adding imports or dependencies.
 2. **Product / LLM behavior:** edit `nova.config.ts` and `packages/agent-core/src/prompts.ts` (never inline long prompts elsewhere).
-3. **New tools for the agent:** add Zod schemas and tool definitions in `apps/web/src/lib/agent/genui/tools.ts`, register on the agent in `nova-agent.ts`, handle execution in `tool-executor` / dashboard code as needed.
-4. **New UI modules in the bento:** extend the vocabulary the LLM can pass to `render_layout`/`render_component` and map `moduleId` to components in the dashboard module renderer.
-5. **Design tokens:** add tokens in `packages/tokens` first; avoid magic colors in feature code.
-6. **Database:** schema changes in `packages/db`, migrations via drizzle-kit; keep tenant scoping in mind.
-7. **Published packages:** use [Changesets](https://github.com/changesets/changesets) (`pnpm changeset`) when versioning `@novasphere/*` packages.
-8. **Tests:** Vitest + RTL per package; Playwright for e2e in the app. Follow project test rules (real shadcn components, `userEvent`, etc.).
+3. **UI toggles / feature flags:** use `nova.config.ts` → `features` (and a few UI flags under `agent`). For example, enable the adapter runtime badge with `novaConfig.agent.showAdapterStatus = true`.
+4. **New tools for the agent:** add Zod schemas and tool definitions in `apps/web/src/lib/agent/genui/tools.ts`, register on the agent in `nova-agent.ts`, handle execution in `tool-executor` / dashboard code as needed.
+5. **New UI modules in the bento:** extend the vocabulary the LLM can pass to `render_layout`/`render_component` and map `moduleId` to components in the dashboard module renderer.
+6. **Design tokens:** add tokens in `packages/tokens` first; avoid magic colors in feature code.
+7. **Database:** schema changes in `packages/db`, migrations via drizzle-kit; keep tenant scoping in mind.
+8. **Published packages:** use [Changesets](https://github.com/changesets/changesets) (`pnpm changeset`) when versioning `@novasphere/*` packages.
+9. **Tests:** Vitest + RTL per package; Playwright for e2e in the app. Follow project test rules (real shadcn components, `userEvent`, etc.).
 
 ---
 

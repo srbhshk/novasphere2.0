@@ -68,8 +68,14 @@ export const novaConfig = {
     ollamaModel: 'qwen2.5:0.5b',
     /** Used when `AI_LATENCY_PROFILE=responsive` (overridden by `OLLAMA_MODEL_FAST` env). */
     ollamaModelFast: 'qwen2.5:3b-instruct',
-    // Show which AI engine is running in the CopilotPanel
-    showAdapterStatus: true,
+    /**
+     * Show the AI adapter runtime badge (engine/status/model) in the UI.
+     *
+     * Toggle:
+     * - `false` (default): hides `AdapterStatusBadge` everywhere (cleaner UI)
+     * - `true`: shows the runtime badge in the Topbar, Agents page, and Copilot header
+     */
+    showAdapterStatus: false,
   },
 
   db: {

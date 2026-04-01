@@ -14,19 +14,13 @@ export type AdapterInfoPopoverProps = {
   className?: string
 }
 
-function getDescription(
-  adapterType: AdapterType | null,
-  modelName: string | null,
-): React.ReactNode {
+function getDescription(adapterType: AdapterType | null): React.ReactNode {
   if (adapterType === 'ollama') {
     return (
       <>
         <p className="text-sm text-[var(--ns-color-text)]">
           Running locally via Ollama. No data leaves your machine.
         </p>
-        {modelName && (
-          <p className="mt-1 text-xs text-[var(--ns-color-muted)]">Model: {modelName}</p>
-        )}
         <a
           href="https://ollama.com"
           target="_blank"
@@ -69,7 +63,7 @@ function getDescription(
 
 export function AdapterInfoPopover({
   adapterType,
-  modelName,
+  modelName: _modelName,
   status,
   open,
   onOpenChange,
@@ -85,7 +79,7 @@ export function AdapterInfoPopover({
             <h3 className="text-sm font-semibold text-[var(--ns-color-text)]">
               AI engine
             </h3>
-            <div className="mt-2">{getDescription(adapterType, modelName)}</div>
+            <div className="mt-2">{getDescription(adapterType)}</div>
             {status === 'checking' && (
               <p className="mt-2 text-xs text-[var(--ns-color-muted)]">
                 Checking for Ollama…

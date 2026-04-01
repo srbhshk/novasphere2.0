@@ -15,6 +15,17 @@ const CopilotPanelNoSsr = dynamic<CopilotPanelProps>(
   { ssr: false },
 )
 
+function normalizeMessageTimestamp(createdAt: unknown): number {
+  if (typeof createdAt === 'number' && Number.isFinite(createdAt)) {
+    return createdAt
+  }
+  if (createdAt instanceof Date) {
+    const t = createdAt.getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+  return 0
+}
+
 function sanitizeStreamingText(raw: string): string | undefined {
   const cleaned = raw.replace(/```(?:json|JSON)?[\s\S]*?```/g, '').trim()
   if (
@@ -97,7 +108,7 @@ export default function CopilotDock(): React.JSX.Element {
         id: (msg['id'] as string) ?? '',
         role: role as 'user' | 'assistant' | 'system',
         content: rawContent,
-        timestamp: typeof msg['createdAt'] === 'number' ? msg['createdAt'] : 0,
+        timestamp: normalizeMessageTimestamp(msg['createdAt']),
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       }
     })
@@ -200,6 +211,7 @@ export default function CopilotDock(): React.JSX.Element {
           isOpen={isOpen}
           onOpenChange={setOpen}
           agentName={novaConfig.agent.name}
+          showAdapterStatus={novaConfig.agent.showAdapterStatus}
           {...(isOpen ? { className: 'h-full w-full' } : {})}
         />
       </div>

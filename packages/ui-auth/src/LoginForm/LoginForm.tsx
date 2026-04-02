@@ -1,7 +1,7 @@
 'use client'
 
 import type React from 'react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff } from 'lucide-react'
@@ -17,6 +17,77 @@ export type LoginFormProps = {
   onSuccess?: (session: AuthSession) => void
   showOAuth?: boolean
   className?: string
+  /** Merged into react-hook-form default values (e.g. demo password). */
+  defaultValues?: Partial<LoginFormValues>
+  /**
+   * When set and the email field is empty and not focused, cycles a typewriter-style
+   * placeholder through each string. Pauses while the user types or focuses the field.
+   */
+  rotatingEmailPlaceholders?: readonly string[]
+}
+
+const DEFAULT_EMAIL_PLACEHOLDER = 'you@example.com'
+
+const TYPE_MS = 70
+const HOLD_MS = 2100
+const BETWEEN_MS = 480
+
+function useRotatingEmailPlaceholder(
+  candidates: readonly string[] | undefined,
+  pauseAnimation: boolean,
+): string {
+  const [text, setText] = useState('')
+  const emailIdxRef = useRef(0)
+  const charIdxRef = useRef(0)
+  const phaseRef = useRef<'typing' | 'hold'>('typing')
+
+  useEffect(() => {
+    if (candidates == null || candidates.length === 0 || pauseAnimation) {
+      setText('')
+      emailIdxRef.current = 0
+      charIdxRef.current = 0
+      phaseRef.current = 'typing'
+      return
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const run = (): void => {
+      const list = candidates
+      const idx = emailIdxRef.current % list.length
+      const full = list[idx]
+      if (full === undefined) return
+
+      if (phaseRef.current === 'typing') {
+        if (charIdxRef.current < full.length) {
+          charIdxRef.current += 1
+          setText(full.slice(0, charIdxRef.current))
+          timeoutId = setTimeout(run, TYPE_MS)
+        } else {
+          phaseRef.current = 'hold'
+          timeoutId = setTimeout(run, HOLD_MS)
+        }
+      } else {
+        phaseRef.current = 'typing'
+        charIdxRef.current = 0
+        setText('')
+        emailIdxRef.current += 1
+        timeoutId = setTimeout(run, BETWEEN_MS)
+      }
+    }
+
+    emailIdxRef.current = 0
+    charIdxRef.current = 0
+    phaseRef.current = 'typing'
+    setText('')
+    timeoutId = setTimeout(run, 0)
+
+    return () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }, [candidates, pauseAnimation])
+
+  return text
 }
 
 export function LoginForm({
@@ -25,18 +96,38 @@ export function LoginForm({
   onSuccess,
   showOAuth = true,
   className,
+  defaultValues: defaultValuesProp,
+  rotatingEmailPlaceholders,
 }: LoginFormProps): React.JSX.Element {
   const [showPassword, setShowPassword] = useState(false)
+  const [emailFocused, setEmailFocused] = useState(false)
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
     setError,
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: {
+      email: defaultValuesProp?.email ?? '',
+      password: defaultValuesProp?.password ?? '',
+    },
   })
+
+  const emailValue = watch('email')
+  const pausePlaceholder =
+    emailValue.length > 0 ||
+    emailFocused ||
+    rotatingEmailPlaceholders == null ||
+    rotatingEmailPlaceholders.length === 0
+  const animatedEmailPlaceholder = useRotatingEmailPlaceholder(
+    rotatingEmailPlaceholders,
+    pausePlaceholder,
+  )
+
+  const emailRegister = register('email')
 
   const isBusy = loading || isSubmitting
 
@@ -71,9 +162,24 @@ export function LoginForm({
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder={
+              rotatingEmailPlaceholders != null &&
+              rotatingEmailPlaceholders.length > 0 &&
+              !pausePlaceholder
+                ? animatedEmailPlaceholder
+                : DEFAULT_EMAIL_PLACEHOLDER
+            }
             className="w-full rounded-lg border border-[color:var(--ns-color-border)] bg-[color:var(--ns-glass-bg-subtle)] px-3 py-2 text-[color:var(--ns-color-text)] placeholder:text-[color:var(--ns-color-muted)] focus:border-[color:var(--ns-color-border-hi)] focus:ring-1 focus:ring-[color:var(--ns-color-accent-20)] focus:outline-none"
-            {...register('email')}
+            name={emailRegister.name}
+            ref={emailRegister.ref}
+            onBlur={(e) => {
+              setEmailFocused(false)
+              void emailRegister.onBlur(e)
+            }}
+            onChange={emailRegister.onChange}
+            onFocus={() => {
+              setEmailFocused(true)
+            }}
           />
           {errors.email?.message != null ? (
             <p className="text-sm text-[color:var(--ns-color-danger)]">

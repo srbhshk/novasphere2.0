@@ -1,0 +1,109 @@
+:root {
+  --ns-tour-popover-bg: color-mix(in srgb, var(--ns-glass-bg-strong) 86%, transparent);
+  --ns-tour-popover-border: color-mix(in srgb, var(--ns-color-border) 92%, transparent);
+  --ns-tour-popover-shadow: 0 22px 80px rgba(0, 0, 0, 0.62);
+}
+
+/* Scope all overrides to our tour only. */
+.ns-demo-tour-popover.driver-popover {
+  background: var(--ns-tour-popover-bg);
+  color: var(--ns-color-text);
+  border: 1px solid var(--ns-tour-popover-border);
+  border-radius: 18px;
+  box-shadow: var(--ns-tour-popover-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 14px;
+}
+
+.ns-demo-tour-popover .driver-popover-title {
+  font-family: var(--font-exo-2), sans-serif;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ns-color-text);
+}
+
+.ns-demo-tour-popover .driver-popover-description {
+  font-family: var(--font-space-grotesk), sans-serif;
+  color: color-mix(in srgb, var(--ns-color-muted) 92%, var(--ns-color-text) 8%);
+  line-height: 1.45;
+}
+
+.ns-demo-tour-popover .driver-popover-progress-text {
+  color: var(--ns-color-muted);
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+.ns-demo-tour-popover .driver-popover-arrow {
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.55));
+}
+
+/* Buttons */
+.ns-demo-tour-popover .driver-popover-footer {
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.ns-demo-tour-popover .driver-popover-btns {
+  gap: 8px;
+}
+
+.ns-demo-tour-popover .driver-popover-btn {
+  border-radius: 12px;
+  border: 1px solid var(--ns-color-border);
+  padding: 10px 12px;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    transform 140ms var(--ns-ease-smooth),
+    background-color 140ms var(--ns-ease-smooth),
+    border-color 140ms var(--ns-ease-smooth),
+    opacity 140ms var(--ns-ease-smooth);
+}
+
+.ns-demo-tour-popover .driver-popover-btn:hover {
+  transform: translateY(-1px);
+}
+
+.ns-demo-tour-popover .driver-popover-next-btn {
+  background: var(--ns-color-accent);
+  border-color: color-mix(
+    in srgb,
+    var(--ns-color-accent) 70%,
+    var(--ns-color-border) 30%
+  );
+  color: var(--ns-color-bg);
+  box-shadow: 0 0 0 6px var(--ns-color-accent-10);
+}
+
+.ns-demo-tour-popover .driver-popover-prev-btn,
+.ns-demo-tour-popover .driver-popover-close-btn {
+  background: var(--ns-glass-bg-subtle);
+  color: var(--ns-color-text);
+}
+
+/* X button in header */
+.ns-demo-tour-popover .driver-popover-close-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Overlay + spotlight stage */
+.driver-overlay {
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.driver-stage {
+  border-radius: 16px !important;
+  box-shadow:
+    0 0 0 1px var(--ns-color-border) inset,
+    0 0 0 8px var(--ns-color-accent-10),
+    0 26px 80px rgba(0, 0, 0, 0.7) !important;
+}

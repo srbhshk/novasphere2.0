@@ -428,6 +428,7 @@ export default function NotificationBell({
       <button
         ref={buttonRef}
         type="button"
+        data-ns-tour="notifications-bell"
         aria-label={
           unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'
         }

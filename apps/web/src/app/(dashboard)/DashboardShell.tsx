@@ -19,6 +19,7 @@ import { useNotificationsStore } from '@/store/notifications.store'
 import { layoutStorageKey } from '@/store/layout-persistence'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
 import NotificationBell from '@/components/NotificationBell'
+import DemoGuidedTour from '@/components/DemoGuidedTour'
 import CopilotDock from './CopilotDock'
 import CopilotCoachmark from './CopilotCoachmark'
 
@@ -180,6 +181,9 @@ export default function DashboardShell({
         topbarRightSlot={topbarRightSlot}
         sidebarBottomSlot={sidebarBottomSlot}
       >
+        {session?.userId && session?.tenantId ? (
+          <DemoGuidedTour userId={session.userId} tenantId={session.tenantId} />
+        ) : null}
         <div
           className={`min-h-0 ${
             isCopilotOpen

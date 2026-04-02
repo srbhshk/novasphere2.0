@@ -167,6 +167,7 @@ export default function CopilotDock(): React.JSX.Element {
 
   return (
     <div
+      data-ns-tour="copilot-dock"
       className={`pointer-events-none fixed z-40 ${
         // Keep the dock pinned to the dashboard main area (below Topbar),
         // so the page scrollbar remains on the dashboard content, not on the dock.

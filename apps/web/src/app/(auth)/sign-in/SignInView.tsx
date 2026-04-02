@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { betterAuthAdapter } from '@/lib/auth/better-auth-adapter'
 import { useSession } from '@/lib/auth/auth-client'
 import { toAuthSession } from '@/lib/auth/better-auth-adapter'
+import { DEMO_SEED_EMAILS, DEMO_SEED_PASSWORD } from '@/lib/demo-seed-credentials'
 
 const LoginForm = dynamic(
   () => import('@novasphere/ui-auth').then((module) => module.LoginForm),
@@ -24,6 +25,8 @@ export default function SignInView(): React.JSX.Element {
     <LoginForm
       adapter={betterAuthAdapter}
       className="p-5 sm:p-6"
+      defaultValues={{ password: DEMO_SEED_PASSWORD }}
+      rotatingEmailPlaceholders={DEMO_SEED_EMAILS}
       loading={isRedirecting}
       onSuccess={() => {
         setIsRedirecting(true)

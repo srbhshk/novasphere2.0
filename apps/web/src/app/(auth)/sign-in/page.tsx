@@ -2,6 +2,7 @@ import type React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import SignInView from './SignInView'
+import SignInCoachmark from './SignInCoachmark'
 import { novaConfig } from 'nova.config'
 
 export default function SignInPage(): React.JSX.Element {
@@ -29,6 +30,7 @@ export default function SignInPage(): React.JSX.Element {
         </p>
       </div>
       <SignInView />
+      <SignInCoachmark />
       <div className="mt-5 flex flex-col gap-2.5 text-sm">
         <Link
           href="/forgot-password"
